@@ -1,0 +1,42 @@
+# Paper Agent Configuration
+
+database:
+  path: "data/paper_db.sqlite"
+
+embedding:
+  save_path: "data/embeddings"
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+collection:
+  rate_limit_seconds: 3
+  max_results_daily: 50
+  max_results_per_category: 10
+
+categories:
+  - "cs.AI"      # Artificial Intelligence
+  - "cs.LG"      # Machine Learning
+  - "cs.CL"      # Computational Linguistics
+  - "cs.CV"      # Computer Vision
+  - "cs.NE"      # Neural and Evolutionary Computing
+  - "cs.RO"      # Robotics
+  - "stat.ML"    # Machine Learning (Statistics)
+
+obsidian:
+  daily_path: "data/daily_logs"
+  vault_path: "data/obsidian_vault"
+  note_path: "data/notes"
+  papers_path: "data/papers_notes"
+
+summarization:
+  enabled: true
+  provider: "openai"  # or "local"
+  model: "gpt-3.5-turbo"
+
+# OpenAI API (optional for summarization)
+openai:
+  api_key: ${OPENAI_API_KEY}
+
+# arXiv API settings
+arxiv:
+  email: ${ARXIV_EMAIL}
+  rate_limit: 3  # seconds between requests

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Agent - 개선된 UI 프로토타입</title>
+    <style>
+        /* 개선된 디자인 시스템 */
+        :root {
+            --primary-blue: #0366d6;
+            --primary-blue-dark: #0256cc;
+            --gray-50: #fafbfc;
+            --gray-100: #f6f8fa;
+            --gray-200: #e1e4e8;
+            --gray-600: #586069;
+            --gray-900: #24292e;
+            --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+            --radius-lg: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        /* 헤더 */
+        .header {
+            background: white;
+            padding: 16px 24px;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 24px;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-blue);
+        }
+
+        .nav {
+            display: flex;
+            gap: 24px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: var(--gray-600);
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .nav a:hover {
+            background: var(--gray-100);
+            color: var(--primary-blue);
+        }
+
+        /* 메인 컨테이너 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* 검색 섹션 */
+        .search-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+
+        .search-title {
+            font-size: 32px;
+            color: var(--gray-900);
+            margin-bottom: 16px;
+        }
+
+        .search-subtitle {
+            color: var(--gray-600);
+            margin-bottom: 32px;
+            font-size: 16px;
+        }
+
+        .search-container {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 56px;
+            border-radius: 28px;
+            border: 2px solid var(--gray-200);
+            padding: 0 24px 0 56px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 4px 20px rgba(3,102,214,0.2);
+            transform: translateY(-2px);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-600);
+            font-size: 20px;
+        }
+
+        /* 비교 섹션 */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        .comparison-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .comparison-title {
+            font-size: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .bad {
+            color: #dc3545;
+        }
+
+        .good {
+            color: #28a745;
+        }
+
+        .terminal {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 16px 0;
+            overflow-x: auto;
+        }
+
+        /* 논문 카드 */
+        .paper-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 16px 0;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--gray-100);
+            transition: all 0.3s ease;
+        }
+
+        .paper-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 28px rgba(0,0,0,0.15);
+        }
+
+        .paper-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .arxiv-id {
+            font-family: monospace;
+            background: var(--gray-100);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--gray-600);
+        }
+
+        .paper-score {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .paper-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin: 0 0 12px 0;
+            line-height: 1.4;
+        }
+
+        .paper-authors {
+            color: var(--gray-600);
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .one-liner {
+            background: var(--gray-100);
+            padding: 12px;
+            border-radius: 8px;
+            font-style: italic;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--primary-blue);
+        }
+
+        .key-info {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .key-info span {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .paper-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-blue-dark);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary-blue);
+            border: 2px solid var(--primary-blue);
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            padding: 8px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-icon:hover {
+            background: var(--gray-100);
+        }
+
+        /* 트렌딩 섹션 */
+        .trending-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px 0;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .section-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .keyword-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .keyword-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .keyword-bubble:hover {
+            transform: scale(1.05);
+        }
+
+        .keyword-bubble::after {
+            content: attr(data-score);
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ff4757;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .search-section {
+                padding: 24px 20px;
+            }
+
+            .search-title {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">📰 Paper Agent</div>
+            <nav class="nav">
+                <a href="#search">🔍 Search</a>
+                <a href="#trending">🔥 Trending</a>
+                <a href="#recommend">🎯 Recommend</a>
+                <a href="#history">📚 History</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- 검색 섹션 -->
+        <section class="search-section" id="search">
+            <h1 class="search-title">논문을 똑똑하게 찾아보세요</h1>
+            <p class="search-subtitle">AI가 도와드리는 arXiv 논문 검색 및 추천 서비스</p>
+            <div class="search-container">
+                <div class="search-icon">🔍</div>
+                <input
+                    type="text"
+                    class="search-input"
+                    placeholder="논문, 주제, 저자 검색..."
+                    onkeyup="simulateSearch(this.value)"
+                >
+            </div>
+        </section>
+
+        <!-- 현재 vs 개선안 비교 -->
+        <section class="comparison">
+            <div class="comparison-card">
+                <h3 class="comparison-title bad">❌ 현재 방식 (나쁨)</h3>
+                <p>터미널에서 복잡한 명령어를 입력해야 함</p>
+                <div class="terminal">
+$ python scripts/recommend.py --idea "contrastive learning" --topk 10<br>
+Top 10 papers for idea: contrastive learning<br>
+1. 2301.12345: SimCLR v2: Improved Contrastive Learning<br>
+2. 2301.12346: MoCo v3: An Empirical Study<br>
+...
+                </div>
+                <p><strong>문제점:</strong></p>
+                <ul style="margin-left: 20px; color: #dc3545;">
+                    <li>명령어를 외워야 함</li>
+                    <li>시각적 정보 없음</li>
+                    <li>모바일 사용 불가</li>
+                    <li>일반 사용자 접근 불가</li>
+                </ul>
+            </div>
+
+            <div class="comparison-card">
+                <h3 class="comparison-title good">✅ 개선안 (좋음)</h3>
+                <p>직관적인 웹 인터페이스로 쉽고 빠르게</p>
+                <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border: 2px dashed #28a745;">
+                    <p style="text-align: center; color: #28a745; font-weight: bold;">
+                        ↑ 위의 검색창에서 바로 사용 가능! ↑
+                    </p>
+                </div>
+                <p><strong>장점:</strong></p>
+                <ul style="margin-left: 20px; color: #28a745;">
+                    <li>클릭만으로 사용 가능</li>
+                    <li>시각적 정보 풍부</li>
+                    <li>모바일 완벽 지원</li>
+                    <li>누구나 쉽게 사용</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 논문 결과 예시 -->
+        <section>
+            <h2 class="section-title">🔍 검색 결과 (실시간 시뮬레이션)</h2>
+            <div id="search-results">
+                <!-- 결과가 여기에 동적으로 표시됩니다 -->
+            </div>
+        </section>
+
+        <!-- 트렌딩 키워드 -->
+        <section class="trending-section" id="trending">
+            <h2 class="section-title">🔥 트렌딩 키워드</h2>
+            <p style="color: #586069; margin-bottom: 20px;">지난 7일간 가장 인기있는 연구 주제들</p>
+            <div class="keyword-cloud">
+                <div class="keyword-bubble" data-score="9.2">transformer</div>
+                <div class="keyword-bubble" data-score="8.7">diffusion model</div>
+                <div class="keyword-bubble" data-score="8.1">large language model</div>
+                <div class="keyword-bubble" data-score="7.9">contrastive learning</div>
+                <div class="keyword-bubble" data-score="7.5">computer vision</div>
+                <div class="keyword-bubble" data-score="7.2">reinforcement learning</div>
+                <div class="keyword-bubble" data-score="6.8">neural network</div>
+                <div class="keyword-bubble" data-score="6.5">deep learning</div>
+                <div class="keyword-bubble" data-score="6.1">attention mechanism</div>
+                <div class="keyword-bubble" data-score="5.9">self-supervised</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // 검색 시뮬레이션
+        function simulateSearch(query) {
+            const resultsDiv = document.getElementById('search-results');
+
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+
+            // 가상의 검색 결과
+            const mockResults = [
+                {
+                    arxiv_id: '2301.12345',
+                    title: 'SimCLR v2: Big Self-Supervised Models are Strong Semi-Supervised Learners',
+                    authors: ['Ting Chen', 'Simon Kornblith', 'Kevin Swersky'],
+                    score: 9.2,
+                    oneLiner: 'Improves self-supervised learning through better data augmentation and larger models',
+                    dataset: 'ImageNet',
+                    model: 'ResNet-152',
+                    metric: '76.5% Top-1 Accuracy'
+                },
+                {
+                    arxiv_id: '2301.12346',
+                    title: 'MoCo v3: An Empirical Study of Training Self-Supervised Vision Transformers',
+                    authors: ['Xinlei Chen', 'Saining Xie', 'Kaiming He'],
+                    score: 8.8,
+                    oneLiner: 'Applies momentum contrastive learning to vision transformers with stability improvements',
+                    dataset: 'COCO',
+                    model: 'ViT-B/16',
+                    metric: '84.1% mAP'
+                },
+                {
+                    arxiv_id: '2301.12347',
+                    title: 'CLIP: Learning Transferable Visual Representations from Natural Language Supervision',
+                    authors: ['Alec Radford', 'Jong Wook Kim', 'Chris Hallacy'],
+                    score: 9.5,
+                    oneLiner: 'Learns visual concepts from natural language descriptions at scale',
+                    dataset: '400M image-text pairs',
+                    model: 'Vision Transformer',
+                    metric: '76.2% ImageNet accuracy'
+                }
+            ];
+
+            // 검색어에 따른 필터링 (단순화)
+            const filtered = mockResults.filter(paper =>
+                paper.title.toLowerCase().includes(query.toLowerCase()) ||
+                paper.oneLiner.toLowerCase().includes(query.toLowerCase())
+            );
+
+            resultsDiv.innerHTML = filtered.map(paper => `
+                <div class="paper-card">
+                    <div class="paper-header">
+                        <span class="arxiv-id">${paper.arxiv_id}</span>
+                        <span class="paper-score">🔥 ${paper.score}</span>
+                    </div>
+                    <h3 class="paper-title">${paper.title}</h3>
+                    <div class="paper-authors">${paper.authors.join(', ')}</div>
+                    <div class="one-liner">${paper.oneLiner}</div>
+                    <div class="key-info">
+                        <span>📊 ${paper.dataset}</span>
+                        <span>🧠 ${paper.model}</span>
+                        <span>✨ ${paper.metric}</span>
+                    </div>
+                    <div class="paper-actions">
+                        <button class="btn btn-primary">📄 요약 읽기</button>
+                        <button class="btn btn-secondary">📥 PDF 다운로드</button>
+                        <button class="btn-icon">⭐</button>
+                        <button class="btn-icon">🔗</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 키워드 클릭 이벤트
+        document.querySelectorAll('.keyword-bubble').forEach(bubble => {
+            bubble.addEventListener('click', function() {
+                const keyword = this.textContent;
+                document.querySelector('.search-input').value = keyword;
+                simulateSearch(keyword);
+                document.getElementById('search-results').scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+
+        // 초기 검색 결과 표시
+        window.addEventListener('load', () => {
+            simulateSearch('contrastive learning');
+        });
+    </script>
+</body>
+</html>

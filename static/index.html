@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Agent - AI-Powered Research Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .search-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .search-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        #searchInput {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        #searchInput:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        #searchBtn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        #searchBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .filters {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        select, input[type="date"] {
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .results-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .paper-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .paper-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .paper-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+        
+        .paper-authors {
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        
+        .paper-meta {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #777;
+        }
+        
+        .paper-abstract {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .paper-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .tag {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Category color coding */
+        .tag.cs-ai { background: #e3f2fd; color: #1565c0; }
+        .tag.cs-cv { background: #e8f5e8; color: #2e7d32; }
+        .tag.cs-lg { background: #fff3e0; color: #ef6c00; }
+        .tag.cs-cl { background: #fce4ec; color: #c2185b; }
+        .tag.cs-ro { background: #f3e5f5; color: #7b1fa2; }
+        .tag.cs-ne { background: #e0f2f1; color: #00695c; }
+        .tag.stat-ml { background: #fff8e1; color: #f57c00; }
+
+        .dark-mode .tag.cs-ai { background: #1e3a8a; color: #93c5fd; }
+        .dark-mode .tag.cs-cv { background: #166534; color: #86efac; }
+        .dark-mode .tag.cs-lg { background: #ea580c; color: #fed7aa; }
+        .dark-mode .tag.cs-cl { background: #be185d; color: #f9a8d4; }
+        .dark-mode .tag.cs-ro { background: #7c2d12; color: #ddd6fe; }
+        .dark-mode .tag.cs-ne { background: #047857; color: #6ee7b7; }
+        .dark-mode .tag.stat-ml { background: #d97706; color: #fbbf24; }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #000;
+        }
+
+        .dark-mode .modal-content {
+            background-color: #1e293b;
+            color: #e2e8f0;
+        }
+
+        .dark-mode .modal-close {
+            color: #cbd5e1;
+        }
+
+        .dark-mode .modal-close:hover {
+            color: #f1f5f9;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-right: 40px;
+        }
+
+        .modal-authors {
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .dark-mode .modal-authors {
+            color: #94a3b8;
+        }
+
+        .modal-abstract {
+            line-height: 1.7;
+            margin-bottom: 20px;
+            text-align: justify;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* Dark mode styles */
+        body.dark-mode {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e2e8f0;
+        }
+
+        .dark-mode .search-section {
+            background: rgba(30, 41, 59, 0.95);
+            color: #e2e8f0;
+        }
+
+        .dark-mode .results-section {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+
+        .dark-mode .paper-card {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        .dark-mode .paper-card:hover {
+            background: #3f4a5a;
+        }
+
+        .dark-mode .paper-title {
+            color: #f1f5f9;
+        }
+
+        .dark-mode #searchInput {
+            background: #475569;
+            border-color: #64748b;
+            color: #f1f5f9;
+        }
+
+        .dark-mode #searchInput::placeholder {
+            color: #94a3b8;
+        }
+
+        .dark-mode select, .dark-mode input[type="date"] {
+            background: #475569;
+            border-color: #64748b;
+            color: #f1f5f9;
+        }
+
+        .trending-keyword {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .trending-keyword:hover {
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+
+        .trending-keyword.hot {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border-color: #ff6b6b;
+        }
+
+        .trending-score {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .dark-mode .trending-keyword {
+            background: #475569;
+            border-color: #64748b;
+            color: #f1f5f9;
+        }
+
+        .dark-mode .trending-keyword:hover {
+            background: #5a6478;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h1>🚀 Paper Agent</h1>
+                    <p class="subtitle">AI-Powered Research Discovery Platform</p>
+                </div>
+                <button id="darkModeToggle" style="
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">🌙 Dark</button>
+            </div>
+        </header>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalPapers">-</div>
+                <div class="stat-label">Papers Indexed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="todayPapers">-</div>
+                <div class="stat-label">Today's Papers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="trendingTopics">-</div>
+                <div class="stat-label">Trending Topics</div>
+            </div>
+        </div>
+        
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search papers by keyword, author, or topic..." />
+                <button id="searchBtn">🔍 Search</button>
+            </div>
+            <div class="filters">
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="cs.AI">Artificial Intelligence</option>
+                    <option value="cs.LG">Machine Learning</option>
+                    <option value="cs.CV">Computer Vision</option>
+                    <option value="cs.CL">Computation and Language</option>
+                    <option value="cs.RO">Robotics</option>
+                </select>
+                <select id="sortBy">
+                    <option value="relevance">Relevance</option>
+                    <option value="date">Date</option>
+                    <option value="citations">Citations</option>
+                </select>
+                <input type="date" id="dateFrom" title="From Date" />
+                <input type="date" id="dateTo" title="To Date" />
+            </div>
+        </div>
+        
+        <div class="results-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📄 Research Papers</h2>
+                <button id="trendingBtn" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">🔥 Trending</button>
+            </div>
+
+            <div id="trendingKeywords" style="display: none; margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px;">🔥 Trending Keywords</h3>
+                <div id="keywordContainer" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+            </div>
+
+            <div id="resultsContainer">
+                <div class="loading">
+                    Enter a search term to discover papers...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paper Detail Modal -->
+    <div id="paperModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="modalContent">
+                <div class="loading">Loading paper details...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        // Load stats on page load
+        loadStats();
+        
+        // Event listeners
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') performSearch();
+        });
+        document.getElementById('searchInput').addEventListener('input', debounceSearch);
+        document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+        document.getElementById('trendingBtn').addEventListener('click', toggleTrending);
+
+        // Trending keywords functionality
+        let trendingVisible = false;
+        async function toggleTrending() {
+            const container = document.getElementById('trendingKeywords');
+            const btn = document.getElementById('trendingBtn');
+
+            if (trendingVisible) {
+                container.style.display = 'none';
+                btn.textContent = '🔥 Trending';
+                trendingVisible = false;
+            } else {
+                container.style.display = 'block';
+                btn.textContent = '❌ Hide';
+                trendingVisible = true;
+                await loadTrendingKeywords();
+            }
+        }
+
+        async function loadTrendingKeywords() {
+            const keywordContainer = document.getElementById('keywordContainer');
+            keywordContainer.innerHTML = '<div style="padding: 10px; color: #666;">Loading trending keywords...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/trending?limit=12`);
+                const data = await response.json();
+
+                const keywordsHTML = data.keywords.map((keyword, index) => `
+                    <span class="trending-keyword ${index < 3 ? 'hot' : ''}"
+                          onclick="searchKeyword('${keyword.keyword}')">
+                        ${keyword.keyword}
+                        <span class="trending-score">${keyword.score.toFixed(1)}</span>
+                    </span>
+                `).join('');
+
+                keywordContainer.innerHTML = keywordsHTML;
+            } catch (error) {
+                keywordContainer.innerHTML = '<div style="color: #e53e3e;">Failed to load trending keywords</div>';
+            }
+        }
+
+        function searchKeyword(keyword) {
+            document.getElementById('searchInput').value = keyword;
+            performSearch();
+            // Hide trending after selection
+            toggleTrending();
+        }
+
+        // Debounced search
+        let searchTimeout;
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            const query = document.getElementById('searchInput').value;
+
+            if (query.length >= 2) {
+                searchTimeout = setTimeout(performSearch, 500); // 500ms delay
+            } else if (query.length === 0) {
+                searchTimeout = setTimeout(() => {
+                    displayResults([], 0); // Clear results
+                }, 200);
+            }
+        }
+
+        // Dark mode functionality
+        function toggleDarkMode() {
+            const body = document.body;
+            const button = document.getElementById('darkModeToggle');
+
+            body.classList.toggle('dark-mode');
+
+            if (body.classList.contains('dark-mode')) {
+                button.textContent = '☀️ Light';
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                button.textContent = '🌙 Dark';
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        }
+
+        // Load dark mode preference
+        function loadDarkModePreference() {
+            const darkMode = localStorage.getItem('darkMode');
+            if (darkMode === 'enabled' || (!darkMode && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('darkModeToggle').textContent = '☀️ Light';
+            }
+        }
+
+        // Initialize dark mode
+        loadDarkModePreference();
+        
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+                
+                document.getElementById('totalPapers').textContent = data.total_papers || '0';
+                document.getElementById('todayPapers').textContent = data.recent_count || '0';
+                document.getElementById('trendingTopics').textContent = data.total_categories || '0';
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+        
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            const category = document.getElementById('categoryFilter').value;
+            const sort = document.getElementById('sortBy').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            
+            if (!query.trim() && !category) {
+                alert('Please enter a search term or select a category');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const params = new URLSearchParams({
+                    q: query,
+                    sort: sort,
+                    limit: 20
+                });
+                
+                if (category) params.append('category', category);
+                if (dateFrom) params.append('date_from', dateFrom);
+                if (dateTo) params.append('date_to', dateTo);
+                
+                const response = await fetch(`${API_BASE}/search?${params}`);
+                const data = await response.json();
+                
+                displayResults(data.papers, data.total);
+            } catch (error) {
+                showError('Failed to search papers. Please try again.');
+                console.error('Search error:', error);
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('resultsContainer').innerHTML = `
+                <div class="loading">🔍 Searching papers...</div>
+            `;
+        }
+        
+        function showError(message) {
+            document.getElementById('resultsContainer').innerHTML = `
+                <div class="loading" style="color: #e53e3e;">❌ ${message}</div>
+            `;
+        }
+        
+        function displayResults(papers, total) {
+            const container = document.getElementById('resultsContainer');
+            
+            if (!papers || papers.length === 0) {
+                container.innerHTML = '<div class="loading">No papers found. Try a different search term.</div>';
+                return;
+            }
+            
+            const resultsHTML = papers.map(paper => `
+                <div class="paper-card" onclick="viewPaper('${paper.arxiv_id}')">
+                    <div class="paper-title">${paper.title}</div>
+                    <div class="paper-authors">${(paper.authors || []).join(', ')}</div>
+                    <div class="paper-meta">
+                        <span>📅 ${paper.date}</span>
+                        <span>📊 ${paper.citation_count || 0} citations</span>
+                        ${paper.venue ? `<span>🏛️ ${paper.venue}</span>` : ''}
+                    </div>
+                    <div class="paper-abstract">${truncateText(paper.abstract || '', 300)}</div>
+                    <div class="paper-tags">
+                        ${(paper.categories || []).map(cat => `<span class="tag ${getCategoryClass(cat)}">${cat}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `
+                <p>Found ${total} papers</p>
+                ${resultsHTML}
+            `;
+        }
+        
+        function truncateText(text, maxLength) {
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        function getCategoryClass(category) {
+            const categoryMap = {
+                'cs.AI': 'cs-ai',
+                'cs.CV': 'cs-cv',
+                'cs.LG': 'cs-lg',
+                'cs.CL': 'cs-cl',
+                'cs.RO': 'cs-ro',
+                'cs.NE': 'cs-ne',
+                'stat.ML': 'stat-ml'
+            };
+            return categoryMap[category] || '';
+        }
+        
+        function viewPaper(arxivId) {
+            openPaperModal(arxivId);
+        }
+
+        async function openPaperModal(arxivId) {
+            const modal = document.getElementById('paperModal');
+            const modalContent = document.getElementById('modalContent');
+
+            modal.style.display = 'block';
+            modalContent.innerHTML = '<div class="loading">Loading paper details...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/papers/${arxivId}`);
+                const paper = await response.json();
+
+                modalContent.innerHTML = `
+                    <div class="modal-title">${paper.title}</div>
+                    <div class="modal-authors">By: ${(paper.authors || []).join(', ')}</div>
+
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px; font-size: 0.9rem; color: #666;">
+                        <span>📅 ${paper.date || paper.published_date}</span>
+                        <span>📊 ${paper.citation_count || 0} citations</span>
+                        ${paper.venue ? `<span>🏛️ ${paper.venue}</span>` : ''}
+                        <span>🔗 ${arxivId}</span>
+                    </div>
+
+                    <div class="paper-tags" style="margin-bottom: 20px;">
+                        ${(paper.categories || []).map(cat => `<span class="tag ${getCategoryClass(cat)}">${cat}</span>`).join('')}
+                    </div>
+
+                    <div class="modal-abstract">
+                        <h3 style="margin-bottom: 10px;">Abstract</h3>
+                        ${paper.abstract}
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button onclick="window.open('https://arxiv.org/abs/${arxivId}', '_blank')"
+                                style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                            📄 View on arXiv
+                        </button>
+                        <button onclick="window.open('https://arxiv.org/pdf/${arxivId}', '_blank')"
+                                style="padding: 10px 20px; background: #48bb78; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                            📥 Download PDF
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                modalContent.innerHTML = '<div style="color: #e53e3e;">Failed to load paper details.</div>';
+            }
+        }
+
+        // Modal close functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('paperModal');
+            const closeBtn = document.querySelector('.modal-close');
+
+            closeBtn.onclick = function() {
+                modal.style.display = 'none';
+            }
+
+            window.onclick = function(event) {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        });
+        
+        // Initialize with empty search
+        setTimeout(() => {
+            document.getElementById('searchInput').value = '';
+            performSearch();
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+# Environment variables
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Frontend build
+frontend/dist/
+frontend/build/
+frontend/node_modules/
+
+# Data and ML files (entire data folder)
+data/
+*.sqlite
+*.sqlite*
+*.db
+*.pkl
+*.bin
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# Logs
+logs/
+*.log
+
+# Cache and temp files
+.cache/
+.tmp/
+temp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*.py
+debug_*.html
