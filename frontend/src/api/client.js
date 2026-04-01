@@ -9,8 +9,26 @@ const api = axios.create({
 })
 
 api.interceptors.response.use(
-  (res) => res.data,
-  (err) => Promise.reject(err?.response?.data || err.message),
+  (res) => {
+    console.log('✅ API Response interceptor:', res.status, res.config.url);
+    return res.data;
+  },
+  (err) => {
+    console.error('❌ API Error interceptor:', err.response?.status, err.config?.url);
+    console.error('Error data:', err.response?.data);
+
+    // Create a more detailed error object
+    const error = new Error(
+      err.response?.data?.detail ||
+      err.response?.data?.message ||
+      err.message ||
+      'Network error'
+    );
+    error.response = err.response;
+    error.status = err.response?.status;
+
+    return Promise.reject(error);
+  }
 )
 
 export const searchPapers = (params) => api.get('/search', { params })

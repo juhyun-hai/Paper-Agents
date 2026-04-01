@@ -1,42 +1,32 @@
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Navbar from './components/Navbar.jsx'
-import Home from './pages/Home.jsx'
-import Search from './pages/Search.jsx'
-import Paper from './pages/Paper.jsx'
-import Graph from './pages/Graph.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Feedback from './pages/Feedback.jsx'
-import AdminFeedback from './pages/AdminFeedback.jsx'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ResearchDashboard from './components/ResearchDashboard';
+import GraphExplorer from './components/GraphExplorer';
+import TrendingPapers from './components/TrendingPapers';
+import Navigation from './components/Navigation';
+import Search from './pages/Search';
+import Paper from './pages/Paper';
+import './App.css';
 
-export default function App() {
-  const [dark, setDark] = useState(() => {
-    return localStorage.getItem('dark') === 'true'
-  })
-
-  useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-    localStorage.setItem('dark', dark)
-  }, [dark])
-
+function App() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-        <Navbar dark={dark} onToggleDark={() => setDark((d) => !d)} />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/paper/:arxiv_id" element={<Paper />} />
-          <Route path="/graph" element={<Graph />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/feedback" element={<Feedback />} />
-          <Route path="/admin/feedback" element={<AdminFeedback />} />
-        </Routes>
+    <Router>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <Navigation />
+
+        <main>
+          <Routes>
+            <Route path="/" element={<Navigate to="/research" replace />} />
+            <Route path="/research" element={<ResearchDashboard />} />
+            <Route path="/graph" element={<GraphExplorer />} />
+            <Route path="/trending" element={<TrendingPapers />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/paper/:arxiv_id" element={<Paper />} />
+          </Routes>
+        </main>
       </div>
-    </BrowserRouter>
-  )
+    </Router>
+  );
 }
+
+export default App;
