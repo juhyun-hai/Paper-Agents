@@ -7,14 +7,20 @@ const Navigation = () => {
 
   const navItems = [
     {
+      path: '/',
+      label: 'Home',
+      icon: '🏠',
+      description: 'Hot Paper homepage'
+    },
+    {
       path: '/search',
-      label: 'Paper Search',
+      label: 'Search',
       icon: '🔍',
       description: 'Search and browse papers'
     },
     {
       path: '/trending',
-      label: 'Trending Papers',
+      label: 'Trending',
       icon: '🔥',
       description: 'Discover hottest papers'
     }
@@ -27,16 +33,16 @@ const Navigation = () => {
 
           {/* Logo */}
           <div className="flex items-center">
-            <Link to="/search" className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">PA</span>
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">🔥</span>
               </div>
               <div>
                 <div className="text-lg font-bold text-gray-900">
-                  Paper Agent
+                  Hot Paper
                 </div>
                 <div className="text-xs text-gray-500 -mt-1">
-                  AI-Powered Paper Analysis
+                  AI Research Trend Discovery
                 </div>
               </div>
             </Link>
