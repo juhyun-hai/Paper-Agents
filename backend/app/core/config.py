@@ -74,8 +74,11 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8080",
-        "https://interpretation-citizens-waters-roster.trycloudflare.com",
-        "https://thread-coins-seeing-oklahoma.trycloudflare.com",
+        "https://hotpaper.ai",
+        "https://www.hotpaper.ai",
+        "https://hotpaper.pages.dev",
+        "https://*.hotpaper.pages.dev",
+        "https://paper-agent-eight.vercel.app",
         "https://*.trycloudflare.com"
     ])
     allowed_methods: List[str] = Field(default=["GET", "POST", "PUT", "DELETE", "OPTIONS"])

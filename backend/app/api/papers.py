@@ -9,7 +9,7 @@ from sqlalchemy import select, func, or_, and_, String
 from sqlalchemy.orm import selectinload
 
 from ..core.database import get_async_session
-from ..models import Paper
+from ..models import Paper, PaperSummary
 from ..schemas.papers import PaperResponse, PapersSearchResponse
 
 router = APIRouter(prefix="/api", tags=["Papers"])
@@ -141,17 +141,18 @@ async def search_papers(
         )
 
 
-@router.get("/papers/{arxiv_id}", response_model=PaperResponse)
+@router.get("/papers/{arxiv_id}")
 async def get_paper(
     arxiv_id: str,
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Get a specific paper by arXiv ID."""
+    """Get a specific paper by arXiv ID with summary."""
     try:
-        result = await session.execute(
+        # Get paper
+        paper_result = await session.execute(
             select(Paper).where(Paper.arxiv_id == arxiv_id)
         )
-        paper = result.scalar_one_or_none()
+        paper = paper_result.scalar_one_or_none()
 
         if not paper:
             raise HTTPException(
@@ -159,18 +160,45 @@ async def get_paper(
                 detail=f"Paper with arXiv ID {arxiv_id} not found"
             )
 
-        return PaperResponse(
-            id=paper.id,
-            arxiv_id=paper.arxiv_id,
-            title=paper.title,
-            authors=paper.authors or [],
-            abstract=paper.abstract or "",
-            categories=paper.categories or [],
-            published_date=paper.published_date.isoformat() if paper.published_date else "",
-            venue=paper.venue,
-            citation_count=paper.citation_count or 0,
-            year=paper.year
+        # Get summary
+        summary_result = await session.execute(
+            select(PaperSummary)
+            .where(PaperSummary.arxiv_id == arxiv_id)
+            .order_by(PaperSummary.created_at.desc())
+            .limit(1)
         )
+        summary = summary_result.scalar_one_or_none()
+
+        # Build response
+        response = {
+            "id": paper.id,
+            "arxiv_id": paper.arxiv_id,
+            "title": paper.title,
+            "authors": paper.authors or [],
+            "abstract": paper.abstract or "",
+            "categories": paper.categories or [],
+            "published_date": paper.published_date.isoformat() if paper.published_date else "",
+            "venue": paper.venue,
+            "citation_count": paper.citation_count or 0,
+            "year": paper.year
+        }
+
+        # Add summary if available
+        if summary:
+            response["summary"] = {
+                "summary_text": summary.summary_text,
+                "summary_type": summary.summary_type,
+                "generation_model": summary.generation_model,
+                "word_count": summary.word_count,
+                "figures": summary.figures or [],
+                "figure_count": summary.figure_count,
+                "has_full_text": summary.has_full_text,
+                "generated_at": summary.generated_at.isoformat() if summary.generated_at else None
+            }
+        else:
+            response["summary"] = None
+
+        return response
 
     except HTTPException:
         raise
@@ -328,28 +356,40 @@ async def get_mini_graph(
         edges = []
 
         # Add center node
+        center_cats = target_paper.categories or []
+        if isinstance(center_cats, str):
+            import json as _json
+            try: center_cats = _json.loads(center_cats)
+            except: center_cats = []
         nodes.append({
             "id": target_paper.arxiv_id,
             "label": target_paper.title,
             "type": "paper",
             "group": "center",
+            "categories": center_cats,
             "properties": {
                 "authors": target_paper.authors or [],
-                "categories": target_paper.categories or []
+                "categories": center_cats
             }
         })
 
         # Add similar nodes and edges
         for paper, score in similar_papers[:max_nodes-1]:
             if paper.arxiv_id != arxiv_id:
+                sim_cats = paper.categories or []
+                if isinstance(sim_cats, str):
+                    import json as _json
+                    try: sim_cats = _json.loads(sim_cats)
+                    except: sim_cats = []
                 nodes.append({
                     "id": paper.arxiv_id,
                     "label": paper.title,
                     "type": "paper",
                     "group": "similar",
+                    "categories": sim_cats,
                     "properties": {
                         "authors": paper.authors or [],
-                        "categories": paper.categories or [],
+                        "categories": sim_cats,
                         "similarity": score
                     }
                 })
