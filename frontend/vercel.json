@@ -2,12 +2,6 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "http://147.46.147.26:8000/$1"
-    }
-  ],
   "routes": [
     {
       "src": "/(.*)",
