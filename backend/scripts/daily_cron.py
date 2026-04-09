@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
 Daily Paper + Trending Collector (cron용)
-매일 새벽 3시 실행: 최신 논문 100개 수집 + trending 업데이트
+매일 새벽 3시 실행: 최신 논문 100개 수집 + 다중 소스 trending 업데이트
+소스: arXiv, HuggingFace, Semantic Scholar, Papers With Code
 """
 import asyncio
 import sys
 import os
 import json
-import requests
 import re
+import requests
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 os.environ.setdefault('HF_HOME', '/home/juhyun/hf_cache')
@@ -18,47 +20,49 @@ import asyncpg
 
 DB_URL = 'postgresql://research_agent:research_pass_2024@localhost:5432/research_intelligence'
 ARXIV_API = 'http://export.arxiv.org/api/query'
-HF_API = 'https://huggingface.co/api/daily_papers'
+HEADERS = {'User-Agent': 'HotPaper/1.0 (https://hotpaper.ai)'}
 
 CATEGORIES = [
     'cs.AI', 'cs.LG', 'cs.CL', 'cs.CV', 'cs.IR',
     'cs.HC', 'cs.RO', 'cs.NE', 'stat.ML',
 ]
 
+SOURCE_WEIGHTS = {
+    'huggingface': 1.8,
+    'semantic_scholar': 1.5,
+    'papers_with_code': 1.3,
+    'arxiv_recent': 1.0,
+}
 
+
+# ──────────────────────────────────────────
+# 1. arXiv 최신 논문 수집
+# ──────────────────────────────────────────
 async def fetch_arxiv_papers(max_results=100):
-    """arXiv에서 최신 논문 수집."""
     cat_query = '+OR+'.join(f'cat:{c}' for c in CATEGORIES)
     url = f'{ARXIV_API}?search_query={cat_query}&sortBy=submittedDate&sortOrder=descending&max_results={max_results}'
-
     try:
-        resp = requests.get(url, timeout=30)
+        resp = requests.get(url, timeout=60, headers=HEADERS)
         if resp.status_code != 200:
             print(f'❌ arXiv API 실패: {resp.status_code}')
             return []
 
         import xml.etree.ElementTree as ET
         root = ET.fromstring(resp.text)
-        ns = {'atom': 'http://www.w3.org/2005/Atom', 'arxiv': 'http://arxiv.org/schemas/atom'}
+        ns = {'atom': 'http://www.w3.org/2005/Atom'}
 
         papers = []
         for entry in root.findall('atom:entry', ns):
-            arxiv_id_raw = entry.find('atom:id', ns).text
-            arxiv_id = arxiv_id_raw.split('/abs/')[-1].split('v')[0]
-
+            arxiv_id = entry.find('atom:id', ns).text.split('/abs/')[-1].split('v')[0]
             title = entry.find('atom:title', ns).text.strip().replace('\n', ' ')
             abstract = entry.find('atom:summary', ns).text.strip().replace('\n', ' ')
             published = entry.find('atom:published', ns).text[:10]
-
             authors = [a.find('atom:name', ns).text for a in entry.findall('atom:author', ns)]
             categories = [c.get('term') for c in entry.findall('atom:category', ns)]
 
             papers.append({
-                'arxiv_id': arxiv_id,
-                'title': title,
-                'abstract': abstract[:2000],
-                'authors': authors,
-                'categories': categories,
+                'arxiv_id': arxiv_id, 'title': title, 'abstract': abstract[:2000],
+                'authors': authors, 'categories': categories,
                 'published_date': published,
                 'pdf_url': f'https://arxiv.org/pdf/{arxiv_id}.pdf',
                 'arxiv_url': f'https://arxiv.org/abs/{arxiv_id}',
@@ -71,14 +75,13 @@ async def fetch_arxiv_papers(max_results=100):
         return []
 
 
+# ──────────────────────────────────────────
+# 2. HuggingFace Daily Papers
+# ──────────────────────────────────────────
 async def fetch_hf_trending():
-    """HuggingFace에서 trending 논문 수집."""
     try:
-        resp = requests.get(HF_API, timeout=15, headers={
-            'User-Agent': 'Mozilla/5.0'
-        })
+        resp = requests.get('https://huggingface.co/api/daily_papers', timeout=15, headers=HEADERS)
         if resp.status_code != 200:
-            print(f'❌ HF API 실패: {resp.status_code}')
             return []
 
         data = resp.json()
@@ -96,39 +99,131 @@ async def fetch_hf_trending():
                 'source': 'huggingface',
             })
 
-        print(f'✅ HuggingFace: {len(papers)}개 trending 수집')
+        print(f'✅ HuggingFace: {len(papers)}개')
         return papers
     except Exception as e:
-        print(f'❌ HF 수집 실패: {e}')
+        print(f'❌ HuggingFace 실패: {e}')
         return []
 
 
-async def save_papers(conn, papers):
-    """논문을 DB에 저장 (중복 건너뛰기)."""
-    saved = 0
-    skipped = 0
-    for p in papers:
-        existing = await conn.fetchrow(
-            "SELECT id FROM papers WHERE arxiv_id = $1", p['arxiv_id']
+# ──────────────────────────────────────────
+# 3. Semantic Scholar - Trending AI/ML papers
+# ──────────────────────────────────────────
+async def fetch_semantic_scholar():
+    try:
+        # Bulk search for recent high-citation AI papers
+        url = 'https://api.semanticscholar.org/graph/v1/paper/search/bulk'
+        params = {
+            'query': 'machine learning deep learning',
+            'year': str(datetime.now().year),
+            'fieldsOfStudy': 'Computer Science',
+            'fields': 'title,abstract,citationCount,externalIds,year',
+            'sort': 'citationCount:desc',
+            'limit': 30,
+        }
+        resp = requests.get(url, params=params, timeout=20, headers=HEADERS)
+        if resp.status_code != 200:
+            # Fallback: use recommendations endpoint
+            url2 = 'https://api.semanticscholar.org/recommendations/v1/papers/?limit=30&fields=title,abstract,citationCount,externalIds'
+            resp = requests.get(url2, timeout=20, headers=HEADERS)
+            if resp.status_code != 200:
+                print(f'❌ Semantic Scholar API: {resp.status_code}')
+                return []
+
+        data = resp.json()
+        paper_list = data.get('data', data.get('recommendedPapers', []))
+
+        papers = []
+        for p in paper_list:
+            arxiv_id = ''
+            ext = p.get('externalIds', {})
+            if ext and ext.get('ArXiv'):
+                arxiv_id = ext['ArXiv']
+            if not arxiv_id:
+                continue
+
+            citations = p.get('citationCount', 0) or 0
+            papers.append({
+                'arxiv_id': arxiv_id,
+                'title': p.get('title', ''),
+                'abstract': (p.get('abstract') or '')[:2000],
+                'upvotes': min(citations, 500),  # Cap to normalize
+                'source': 'semantic_scholar',
+            })
+
+        print(f'✅ Semantic Scholar: {len(papers)}개')
+        return papers
+    except Exception as e:
+        print(f'❌ Semantic Scholar 실패: {e}')
+        return []
+
+
+# ──────────────────────────────────────────
+# 4. Papers With Code - Trending
+# ──────────────────────────────────────────
+async def fetch_papers_with_code():
+    try:
+        resp = requests.get(
+            'https://paperswithcode.com/api/v1/papers/',
+            params={'ordering': '-proceeding', 'items_per_page': 30},
+            timeout=15, headers=HEADERS
         )
+        if resp.status_code != 200:
+            print(f'❌ PapersWithCode API: {resp.status_code}')
+            return []
+
+        data = resp.json()
+        results = data.get('results', data) if isinstance(data, dict) else data
+
+        papers = []
+        for p in (results if isinstance(results, list) else []):
+            arxiv_id = ''
+            if p.get('arxiv_id'):
+                arxiv_id = p['arxiv_id']
+            elif p.get('url_abs') and 'arxiv.org' in str(p['url_abs']):
+                match = re.search(r'(\d{4}\.\d{4,5})', str(p['url_abs']))
+                if match:
+                    arxiv_id = match.group(1)
+
+            if not arxiv_id:
+                continue
+
+            stars = p.get('repository_count', 0) or p.get('stars', 0) or 0
+            papers.append({
+                'arxiv_id': arxiv_id,
+                'title': p.get('title', ''),
+                'abstract': (p.get('abstract') or '')[:2000],
+                'upvotes': stars * 3,  # Weight GitHub stars
+                'source': 'papers_with_code',
+            })
+
+        print(f'✅ Papers With Code: {len(papers)}개')
+        return papers
+    except Exception as e:
+        print(f'❌ Papers With Code 실패: {e}')
+        return []
+
+
+# ──────────────────────────────────────────
+# DB 저장
+# ──────────────────────────────────────────
+async def save_papers(conn, papers):
+    saved, skipped = 0, 0
+    for p in papers:
+        existing = await conn.fetchrow("SELECT id FROM papers WHERE arxiv_id = $1", p['arxiv_id'])
         if existing:
             skipped += 1
             continue
-
         try:
             await conn.execute("""
                 INSERT INTO papers (arxiv_id, title, abstract, authors, categories,
                                     published_date, pdf_url, html_url, created_at, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
             """,
-                p['arxiv_id'],
-                p['title'],
-                p['abstract'],
-                json.dumps(p.get('authors', [])),
-                json.dumps(p.get('categories', [])),
+                p['arxiv_id'], p['title'], p['abstract'],
+                json.dumps(p.get('authors', [])), json.dumps(p.get('categories', [])),
                 datetime.strptime(p['published_date'], '%Y-%m-%d') if p.get('published_date') else datetime.now(),
-                p.get('pdf_url', ''),
-                p.get('arxiv_url', ''),
+                p.get('pdf_url', ''), p.get('arxiv_url', ''),
             )
             saved += 1
         except Exception as e:
@@ -138,73 +233,114 @@ async def save_papers(conn, papers):
     return saved
 
 
-async def save_trending(conn, hf_papers):
-    """Trending 논문 저장."""
+async def save_trending(conn, all_source_papers):
+    """다중 소스 통합 trending 저장."""
     today = datetime.now().date()
 
     # 오늘 trending 초기화
-    await conn.execute(
-        "DELETE FROM trending_papers WHERE DATE(created_at) = $1", today
-    )
+    await conn.execute("DELETE FROM trending_papers WHERE DATE(created_at) = $1", today)
+
+    # 논문별 점수 통합
+    paper_scores = defaultdict(lambda: {
+        'title': '', 'sources': [], 'total_score': 0.0, 'abstract': ''
+    })
+
+    for p in all_source_papers:
+        aid = p['arxiv_id']
+        source = p['source']
+        weight = SOURCE_WEIGHTS.get(source, 1.0)
+        score = max(0.1, p.get('upvotes', 0)) * weight
+
+        paper_scores[aid]['total_score'] += score
+        if source not in paper_scores[aid]['sources']:
+            paper_scores[aid]['sources'].append(source)
+        if len(p.get('title', '')) > len(paper_scores[aid]['title']):
+            paper_scores[aid]['title'] = p['title']
+        if len(p.get('abstract', '')) > len(paper_scores[aid]['abstract']):
+            paper_scores[aid]['abstract'] = p['abstract']
+
+    # 크로스 플랫폼 보너스
+    for aid, data in paper_scores.items():
+        if len(data['sources']) >= 3:
+            data['total_score'] *= 1.5
+        elif len(data['sources']) >= 2:
+            data['total_score'] *= 1.3
+
+    # 정렬 및 저장
+    ranked = sorted(paper_scores.items(), key=lambda x: x[1]['total_score'], reverse=True)
 
     saved = 0
-    for i, p in enumerate(hf_papers):
-        score = max(0.1, (p.get('upvotes', 0) * 1.8))
-        final_score = score * (1.3 if i < 10 else 1.0)
-
+    for rank, (aid, data) in enumerate(ranked[:100], 1):
         try:
             await conn.execute("""
                 INSERT INTO trending_papers (arxiv_id, title, sources,
                                               trending_score, final_score, rank,
-                                              date, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                                              multi_source_bonus, date, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
             """,
-                p['arxiv_id'], p['title'], json.dumps(['huggingface']),
-                score, final_score, i + 1, today
+                aid, data['title'], json.dumps(data['sources']),
+                data['total_score'], data['total_score'], rank,
+                1.5 if len(data['sources']) >= 3 else (1.3 if len(data['sources']) >= 2 else 1.0),
+                today
             )
             saved += 1
         except Exception as e:
-            print(f'  ⚠️ trending {p["arxiv_id"]} 저장 실패: {e}')
+            print(f'  ⚠️ trending {aid} 저장 실패: {e}')
+
+    source_counts = defaultdict(int)
+    for data in paper_scores.values():
+        for s in data['sources']:
+            source_counts[s] += 1
 
     print(f'🔥 Trending 저장: {saved}개')
+    print(f'   소스별: {dict(source_counts)}')
+    multi = sum(1 for d in paper_scores.values() if len(d['sources']) >= 2)
+    print(f'   크로스 플랫폼: {multi}개 논문')
     return saved
 
 
+# ──────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────
 async def main():
     start = datetime.now()
     print(f'{"="*60}')
-    print(f'🚀 Daily Paper Collector - {start.strftime("%Y-%m-%d %H:%M:%S")}')
+    print(f'🚀 Hot Paper Daily Collector - {start.strftime("%Y-%m-%d %H:%M:%S")}')
     print(f'{"="*60}')
 
     conn = await asyncpg.connect(DB_URL)
 
-    # 1. arXiv 최신 논문 수집
+    # 1. arXiv 최신 논문
     print('\n📚 Step 1: arXiv 논문 수집...')
     arxiv_papers = await fetch_arxiv_papers(100)
     new_count = await save_papers(conn, arxiv_papers)
 
-    # 2. HuggingFace trending 수집
-    print('\n🔥 Step 2: HuggingFace trending 수집...')
-    hf_papers = await fetch_hf_trending()
+    # 2. 다중 소스 trending 수집 (병렬)
+    print('\n🔥 Step 2: 다중 소스 Trending 수집...')
+    hf_papers, ss_papers, pwc_papers = await asyncio.gather(
+        fetch_hf_trending(),
+        fetch_semantic_scholar(),
+        fetch_papers_with_code(),
+    )
 
-    # HF 논문 중 DB에 없는 것도 저장
-    hf_as_papers = []
-    for p in hf_papers:
+    all_trending = hf_papers + ss_papers + pwc_papers
+
+    # trending 논문 중 DB에 없는 것 저장
+    for p in all_trending:
         if p.get('title') and p.get('abstract'):
-            hf_as_papers.append({
-                'arxiv_id': p['arxiv_id'],
-                'title': p['title'],
-                'abstract': p['abstract'],
-                'authors': [],
-                'categories': [],
+            await save_papers(conn, [{
+                'arxiv_id': p['arxiv_id'], 'title': p['title'],
+                'abstract': p['abstract'], 'authors': [], 'categories': [],
                 'published_date': datetime.now().strftime('%Y-%m-%d'),
                 'pdf_url': f'https://arxiv.org/pdf/{p["arxiv_id"]}.pdf',
                 'arxiv_url': f'https://arxiv.org/abs/{p["arxiv_id"]}',
-            })
-    await save_papers(conn, hf_as_papers)
-    await save_trending(conn, hf_papers)
+            }])
 
-    # 3. 통계
+    # 3. 통합 trending 저장
+    print('\n📊 Step 3: 통합 Trending 점수 계산...')
+    await save_trending(conn, all_trending)
+
+    # 4. 통계
     total = await conn.fetchval('SELECT count(*) FROM papers')
     trending_count = await conn.fetchval(
         "SELECT count(*) FROM trending_papers WHERE DATE(created_at) = $1",
@@ -217,6 +353,7 @@ async def main():
     print(f'   전체 논문: {total}개')
     print(f'   신규 추가: {new_count}개')
     print(f'   오늘 Trending: {trending_count}개')
+    print(f'   Active Sources: HuggingFace({len(hf_papers)}), Semantic Scholar({len(ss_papers)}), PapersWithCode({len(pwc_papers)})')
     print(f'{"="*60}')
 
     await conn.close()

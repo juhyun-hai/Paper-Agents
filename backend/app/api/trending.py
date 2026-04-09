@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/trending", tags=["Trending"])
 
 @router.get("/today")
 async def get_today_trending(
-    limit: int = Query(20, le=50, description="Number of trending papers"),
+    limit: int = Query(20, le=200, description="Number of trending papers"),
     session: AsyncSession = Depends(get_async_session)
 ):
     """Get today's trending papers."""
