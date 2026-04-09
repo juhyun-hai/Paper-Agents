@@ -21,7 +21,7 @@ export default function Navbar({ dark, onToggleDark }) {
   const navLinks = [
     { to: '/', label: 'Home' },
     { to: '/search', label: 'Search' },
-    { to: '/graph', label: 'Graph' },
+    { to: '/trending', label: 'Trending' },
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/feedback', label: 'Feedback' },
   ]

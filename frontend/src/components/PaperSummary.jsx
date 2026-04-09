@@ -145,30 +145,6 @@ const PaperSummary = ({ arxivId, paper }) => {
         </ReactMarkdown>
       </div>
 
-      {/* Paper Figures */}
-      {summary.figures && summary.figures.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <span className="mr-2">📊</span>
-            논문 주요 그림 ({summary.figures.length}개)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {summary.figures.map((fig, idx) => (
-              <div key={idx} className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                <img
-                  src={fig.data}
-                  alt={`Figure ${idx + 1} (page ${fig.page})`}
-                  className="w-full h-auto object-contain bg-gray-50"
-                  loading="lazy"
-                />
-                <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t">
-                  Figure {idx + 1} &middot; Page {fig.page} &middot; {fig.width}x{fig.height}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

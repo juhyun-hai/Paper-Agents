@@ -275,7 +275,7 @@ const TrendingPapers = () => {
                   {/* Score */}
                   <div className="text-right">
                     <div className="text-lg font-bold text-orange-600">
-                      {paper.final_score || paper.weekly_score || paper.trending_score || 0}
+                      {(paper.final_score || paper.weekly_score || paper.trending_score || 0).toFixed(2)}
                     </div>
                     <div className="text-xs text-gray-500">trending score</div>
                   </div>

@@ -241,12 +241,6 @@ export default function Paper() {
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">🕸️ Related Graph</h3>
               <MiniGraph data={graphData} focusId={arxiv_id} />
-              <Link
-                to="/graph"
-                className="block text-xs text-center text-blue-600 hover:text-blue-800 mt-3 font-medium"
-              >
-                Full Graph 보기 →
-              </Link>
             </div>
           )}
 
