@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 const TrendingPapers = () => {
   const [trendingPapers, setTrendingPapers] = useState([]);
   const [weeklyPapers, setWeeklyPapers] = useState([]);
@@ -21,10 +23,10 @@ const TrendingPapers = () => {
     try {
       // Load all trending data in parallel
       const [todayRes, weekRes, statsRes, sourcesRes] = await Promise.all([
-        fetch('/api/trending/today?limit=30'),
-        fetch('/api/trending/week?limit=50'),
-        fetch('/api/trending/stats'),
-        fetch('/api/trending/sources')
+        fetch(`${API_BASE}/trending/today?limit=30`),
+        fetch(`${API_BASE}/trending/week?limit=50`),
+        fetch(`${API_BASE}/trending/stats`),
+        fetch(`${API_BASE}/trending/sources`)
       ]);
 
       if (todayRes.ok) {
