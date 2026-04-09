@@ -256,12 +256,6 @@ export default function Home() {
           >
             🔥 트렌딩 보기
           </Link>
-          <Link
-            to="/dashboard"
-            className="bg-gray-800 hover:bg-gray-900 text-white px-8 py-3 rounded-xl font-medium transition-colors"
-          >
-            📊 대시보드
-          </Link>
         </div>
       </section>
     </main>

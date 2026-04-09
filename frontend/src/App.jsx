@@ -53,7 +53,7 @@ function App() {
                   Developed by <span className="text-white font-medium">Juhyun Kim</span>
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  © 2026 Hot Paper · Powered by Claude AI
+                  © 2026 Hot Paper
                 </p>
               </div>
             </div>
