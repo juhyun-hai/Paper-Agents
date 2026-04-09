@@ -22,8 +22,8 @@ const TrendingPapers = () => {
     try {
       // Load all trending data in parallel
       const [todayRes, weekRes, statsRes, sourcesRes] = await Promise.all([
-        fetch(`${API_BASE}/trending/today?limit=30`),
-        fetch(`${API_BASE}/trending/week?limit=50`),
+        fetch(`${API_BASE}/trending/today?limit=100`),
+        fetch(`${API_BASE}/trending/week?limit=100`),
         fetch(`${API_BASE}/trending/stats`),
         fetch(`${API_BASE}/trending/sources`)
       ]);
