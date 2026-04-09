@@ -23,9 +23,9 @@ const FEATURES = [
     desc: 'HuggingFace, arXiv 등 다중 소스에서 실시간 인기 논문을 수집하고 점수화합니다.',
   },
   {
-    icon: '🕸️',
-    title: 'Knowledge Graph',
-    desc: '논문 간 관계를 시각적 그래프로 탐색. 유사 연구를 직관적으로 발견합니다.',
+    icon: '🔗',
+    title: '유사 논문 추천',
+    desc: '임베딩 기반 시맨틱 유사도로 관련 논문을 자동 추천. 연구 맥락을 빠르게 파악합니다.',
   },
 ]
 
@@ -96,7 +96,7 @@ export default function Home() {
           </h1>
 
           <p className="text-lg sm:text-xl text-blue-100 max-w-2xl mx-auto leading-relaxed">
-            AI가 분석하는 최신 arXiv 논문 트렌드. 한국어 요약, 지식 그래프, 실시간 인기 논문까지.
+            AI가 분석하는 최신 arXiv 논문 트렌드. 한국어 요약, 유사 논문 추천, 실시간 인기 논문까지.
           </p>
 
           <div className="max-w-2xl mx-auto">
