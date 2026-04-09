@@ -11,7 +11,6 @@ export const CATEGORY_LABELS = {
   'cs.NE': 'Neural & Evolutionary Computing',
   'cs.RO': 'Robotics',
   'cs.IR': 'Information Retrieval',
-  'hai': 'HAI Lab (SNU)',
 }
 
 export const CATEGORY_COLORS = {
@@ -23,7 +22,6 @@ export const CATEGORY_COLORS = {
   'cs.NE': '#06b6d4',
   'cs.RO': '#ec4899',
   'cs.IR': '#84cc16',
-  'hai': '#0f766e',
 }
 
 export const CATEGORY_TAILWIND = {
@@ -35,7 +33,6 @@ export const CATEGORY_TAILWIND = {
   'cs.NE': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
   'cs.RO': 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300',
   'cs.IR': 'bg-lime-100 text-lime-700 dark:bg-lime-900 dark:text-lime-300',
-  'hai': 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300',
 }
 
 /**

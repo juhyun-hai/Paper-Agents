@@ -1,7 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import ResearchDashboard from './components/ResearchDashboard';
-import GraphExplorer from './components/GraphExplorer';
 import TrendingPapers from './components/TrendingPapers';
 import Navigation from './components/Navigation';
 import Search from './pages/Search';
@@ -16,9 +14,7 @@ function App() {
 
         <main>
           <Routes>
-            <Route path="/" element={<Navigate to="/research" replace />} />
-            <Route path="/research" element={<ResearchDashboard />} />
-            <Route path="/graph" element={<GraphExplorer />} />
+            <Route path="/" element={<Navigate to="/search" replace />} />
             <Route path="/trending" element={<TrendingPapers />} />
             <Route path="/search" element={<Search />} />
             <Route path="/paper/:arxiv_id" element={<Paper />} />
