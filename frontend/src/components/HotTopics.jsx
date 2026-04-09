@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { API_BASE } from '../api/client'
 
 const SOURCE_CONFIG = {
   'HuggingFace Papers': { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: '🤗' },
@@ -94,7 +95,7 @@ export default function HotTopics() {
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/hot-topics?days=${days}`)
+    fetch(`${API_BASE}/hot-topics?days=${days}`)
       .then(r => r.json())
       .then(data => {
         setTopics(data.topics || [])

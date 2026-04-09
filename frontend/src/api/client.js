@@ -41,4 +41,7 @@ export const getStats = () => api.get('/stats')
 export const getTrends = (days = 30) => api.get('/trends', { params: { days } })
 export const getCategories = () => api.get('/categories')
 
+// Helper for components using raw fetch instead of axios
+export const API_BASE = apiBaseURL
+
 export default api

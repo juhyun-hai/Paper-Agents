@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { API_BASE } from '../api/client'
 
 const CATEGORY_LABEL = {
   general: '일반',
@@ -21,7 +22,7 @@ export default function AdminFeedback() {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    fetch('/api/feedback')
+    fetch(`${API_BASE}/feedback`)
       .then(r => r.json())
       .then(d => { setItems(d.feedback || []); setLoading(false) })
       .catch(() => setLoading(false))

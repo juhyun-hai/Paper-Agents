@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { API_BASE } from '../api/client';
 
 const PaperSummary = ({ arxivId, paper }) => {
   const [summary, setSummary] = useState(null);
@@ -26,7 +27,7 @@ const PaperSummary = ({ arxivId, paper }) => {
       console.log(`📡 Loading summary for ${arxivId}...`);
 
       // Try to get summary from papers API first
-      const paperResponse = await fetch(`/api/papers/${arxivId}`);
+      const paperResponse = await fetch(`${API_BASE}/papers/${arxivId}`);
       const paperData = await paperResponse.json();
 
       console.log('📋 Paper data:', paperData);
@@ -38,7 +39,7 @@ const PaperSummary = ({ arxivId, paper }) => {
         console.log('❌ No summary in paper data, trying summary API...');
 
         // Fallback to summary API
-        const summaryResponse = await fetch(`/api/summary/${arxivId}`);
+        const summaryResponse = await fetch(`${API_BASE}/summary/${arxivId}`);
         const summaryData = await summaryResponse.json();
 
         console.log('📋 Summary API data:', summaryData);

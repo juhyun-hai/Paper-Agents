@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { API_BASE } from '../api/client'
 
 const CATEGORIES = [
   { value: 'general', label: '일반 의견' },
@@ -16,7 +17,7 @@ export default function Feedback() {
     if (!form.message.trim()) return
     setStatus('loading')
     try {
-      const res = await fetch('/api/feedback', {
+      const res = await fetch(`${API_BASE}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

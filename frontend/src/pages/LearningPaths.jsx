@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE } from '../api/client'
 
 const DIFFICULTY_COLORS = {
   'beginner': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -29,7 +30,7 @@ function RoadmapCard({ roadmap }) {
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/learning-roadmaps/${roadmap.track_name}`)
+      const response = await fetch(`${API_BASE}/learning-roadmaps/${roadmap.track_name}`)
       const data = await response.json()
       setPapers(data.papers || [])
     } catch (error) {
@@ -212,7 +213,7 @@ export default function LearningPaths() {
   const [searchTopic, setSearchTopic] = useState('')
 
   useEffect(() => {
-    fetch('/api/learning-roadmaps')
+    fetch(`${API_BASE}/learning-roadmaps`)
       .then(r => r.json())
       .then(data => {
         setRoadmaps(data.roadmaps || [])
@@ -233,7 +234,7 @@ export default function LearningPaths() {
     setSearching(true)
     setSearchResult(null)
     try {
-      const response = await fetch(`/api/research-path?topic=${encodeURIComponent(searchTopic)}&level=beginner`)
+      const response = await fetch(`${API_BASE}/research-path?topic=${encodeURIComponent(searchTopic)}&level=beginner`)
       const data = await response.json()
 
       if (data && data.papers && data.papers.length > 0) {

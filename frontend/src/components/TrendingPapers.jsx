@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+import { API_BASE } from '../api/client';
 
 const TrendingPapers = () => {
   const [trendingPapers, setTrendingPapers] = useState([]);
