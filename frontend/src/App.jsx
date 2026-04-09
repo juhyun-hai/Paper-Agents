@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import TrendingPapers from './components/TrendingPapers';
 import Navigation from './components/Navigation';
+import Home from './pages/Home';
 import Search from './pages/Search';
 import Paper from './pages/Paper';
 import './App.css';
@@ -14,7 +15,7 @@ function App() {
 
         <main>
           <Routes>
-            <Route path="/" element={<Navigate to="/search" replace />} />
+            <Route path="/" element={<Home />} />
             <Route path="/trending" element={<TrendingPapers />} />
             <Route path="/search" element={<Search />} />
             <Route path="/paper/:arxiv_id" element={<Paper />} />

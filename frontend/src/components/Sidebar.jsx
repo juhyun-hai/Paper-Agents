@@ -47,16 +47,16 @@ export default function Sidebar({ filters, onChange }) {
 
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
         <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">Categories</h3>
-        <div className="space-y-2">
+        <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
           {ALL_CATEGORIES.map((cat) => (
             <label key={cat} className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={categories.includes(cat)}
                 onChange={() => toggleCategory(cat)}
-                className="accent-primary"
+                className="accent-primary flex-shrink-0"
               />
-              <span className="text-sm text-gray-600 dark:text-gray-300">{getCategoryLabel(cat)}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300 truncate">{getCategoryLabel(cat)}</span>
             </label>
           ))}
         </div>
