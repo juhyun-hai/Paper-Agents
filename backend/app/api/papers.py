@@ -40,14 +40,15 @@ async def search_papers(
         # Add search conditions
         conditions = []
 
-        # Text search in title and abstract
+        # Text search in title and abstract (each word must match)
         if q.strip():
-            search_term = f"%{q.strip()}%"
-            text_condition = or_(
-                Paper.title.ilike(search_term),
-                Paper.abstract.ilike(search_term)
-            )
-            conditions.append(text_condition)
+            words = q.strip().split()
+            for word in words:
+                term = f"%{word}%"
+                conditions.append(or_(
+                    Paper.title.ilike(term),
+                    Paper.abstract.ilike(term)
+                ))
 
         # Category filter - simplified approach
         if category:
