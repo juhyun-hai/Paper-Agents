@@ -15,6 +15,20 @@ from ..schemas.papers import PaperResponse
 router = APIRouter(prefix="/api/trending", tags=["Trending"])
 
 
+def _parse_sources(sources_str):
+    """Parse sources field - could be JSON array string or comma-separated."""
+    if not sources_str:
+        return []
+    import json
+    try:
+        parsed = json.loads(sources_str)
+        if isinstance(parsed, list):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return [s.strip() for s in sources_str.split(',') if s.strip()]
+
+
 @router.get("/today")
 async def get_today_trending(
     limit: int = Query(20, le=200, description="Number of trending papers"),
@@ -56,7 +70,7 @@ async def get_today_trending(
                     "trending_rank": tp.rank,
                     "trending_score": tp.trending_score,
                     "final_score": tp.final_score,
-                    "sources": tp.sources.split(',') if tp.sources else [],
+                    "sources": _parse_sources(tp.sources),
                     "multi_source_bonus": tp.multi_source_bonus
                 })
             else:
@@ -75,7 +89,7 @@ async def get_today_trending(
                     "trending_rank": tp.rank,
                     "trending_score": tp.trending_score,
                     "final_score": tp.final_score,
-                    "sources": tp.sources.split(',') if tp.sources else [],
+                    "sources": _parse_sources(tp.sources),
                     "multi_source_bonus": tp.multi_source_bonus
                 })
 
@@ -95,14 +109,14 @@ async def get_today_trending(
 
 @router.get("/week")
 async def get_weekly_trending(
-    limit: int = Query(30, le=100, description="Number of trending papers"),
+    limit: int = Query(100, le=200, description="Number of trending papers"),
     session: AsyncSession = Depends(get_async_session)
 ):
     """Get this week's trending papers aggregated across all days."""
     try:
         week_ago = date.today() - timedelta(days=7)
 
-        # Aggregate trending papers from the last week
+        # Get ALL trending papers from the last week for proper aggregation
         result = await session.execute(
             select(TrendingPaper)
             .where(TrendingPaper.date >= week_ago)
@@ -111,7 +125,6 @@ async def get_weekly_trending(
                 TrendingPaper.trending_score.desc(),
                 TrendingPaper.rank.asc()
             )
-            .limit(limit)
         )
 
         trending_papers = result.scalars().all()
@@ -125,7 +138,7 @@ async def get_weekly_trending(
                     'total_score': tp.final_score or tp.trending_score or 0,
                     'best_rank': tp.rank or 999,
                     'days_trending': 1,
-                    'all_sources': set(tp.sources.split(',') if tp.sources else [])
+                    'all_sources': set(_parse_sources(tp.sources))
                 }
             else:
                 paper_aggregates[tp.arxiv_id]['total_score'] += tp.final_score or tp.trending_score or 0
@@ -135,7 +148,7 @@ async def get_weekly_trending(
                 )
                 paper_aggregates[tp.arxiv_id]['days_trending'] += 1
                 paper_aggregates[tp.arxiv_id]['all_sources'].update(
-                    tp.sources.split(',') if tp.sources else []
+                    _parse_sources(tp.sources)
                 )
 
         # Sort by aggregated score
