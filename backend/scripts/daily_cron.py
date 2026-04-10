@@ -29,9 +29,8 @@ CATEGORIES = [
 
 SOURCE_WEIGHTS = {
     'huggingface': 1.8,
-    'semantic_scholar': 1.5,
-    'papers_with_code': 1.3,
-    'arxiv_recent': 1.0,
+    'arxiv_rss': 1.2,
+    'crossref': 1.5,
 }
 
 
@@ -107,100 +106,107 @@ async def fetch_hf_trending():
 
 
 # ──────────────────────────────────────────
-# 3. Semantic Scholar - Trending AI/ML papers
+# 3. arXiv RSS - 카테고리별 최신 논문
 # ──────────────────────────────────────────
-async def fetch_semantic_scholar():
-    try:
-        # Bulk search for recent high-citation AI papers
-        url = 'https://api.semanticscholar.org/graph/v1/paper/search/bulk'
-        params = {
-            'query': 'machine learning deep learning',
-            'year': str(datetime.now().year),
-            'fieldsOfStudy': 'Computer Science',
-            'fields': 'title,abstract,citationCount,externalIds,year',
-            'sort': 'citationCount:desc',
-            'limit': 30,
-        }
-        resp = requests.get(url, params=params, timeout=20, headers=HEADERS)
-        if resp.status_code != 200:
-            # Fallback: use recommendations endpoint
-            url2 = 'https://api.semanticscholar.org/recommendations/v1/papers/?limit=30&fields=title,abstract,citationCount,externalIds'
-            resp = requests.get(url2, timeout=20, headers=HEADERS)
+async def fetch_arxiv_rss():
+    import xml.etree.ElementTree as ET
+    papers = []
+    rss_cats = ['cs.AI', 'cs.LG', 'cs.CL', 'cs.CV']
+
+    for cat in rss_cats:
+        try:
+            resp = requests.get(f'https://rss.arxiv.org/rss/{cat}', timeout=15, headers=HEADERS)
             if resp.status_code != 200:
-                print(f'❌ Semantic Scholar API: {resp.status_code}')
-                return []
-
-        data = resp.json()
-        paper_list = data.get('data', data.get('recommendedPapers', []))
-
-        papers = []
-        for p in paper_list:
-            arxiv_id = ''
-            ext = p.get('externalIds', {})
-            if ext and ext.get('ArXiv'):
-                arxiv_id = ext['ArXiv']
-            if not arxiv_id:
                 continue
+            root = ET.fromstring(resp.text)
+            items = root.findall('.//item')
 
-            citations = p.get('citationCount', 0) or 0
-            papers.append({
-                'arxiv_id': arxiv_id,
-                'title': p.get('title', ''),
-                'abstract': (p.get('abstract') or '')[:2000],
-                'upvotes': min(citations, 500),  # Cap to normalize
-                'source': 'semantic_scholar',
-            })
+            for item in items[:20]:
+                title = item.find('title').text or ''
+                link = item.find('link').text or ''
+                desc = item.find('description').text or ''
 
-        print(f'✅ Semantic Scholar: {len(papers)}개')
-        return papers
-    except Exception as e:
-        print(f'❌ Semantic Scholar 실패: {e}')
-        return []
+                arxiv_id = link.split('/')[-1] if link else ''
+                if not arxiv_id or len(arxiv_id) < 5:
+                    continue
+
+                # 중복 체크
+                if any(p['arxiv_id'] == arxiv_id for p in papers):
+                    continue
+
+                papers.append({
+                    'arxiv_id': arxiv_id,
+                    'title': title.replace('\n', ' ').strip(),
+                    'abstract': desc[:2000],
+                    'upvotes': 5,  # RSS는 기본 점수
+                    'source': 'arxiv_rss',
+                })
+
+            await asyncio.sleep(0.5)  # rate limit
+        except Exception as e:
+            print(f'  ⚠️ arXiv RSS {cat}: {e}')
+
+    print(f'✅ arXiv RSS: {len(papers)}개')
+    return papers
 
 
 # ──────────────────────────────────────────
-# 4. Papers With Code - Trending
+# 4. Crossref - 최근 인용 급증 AI 논문
 # ──────────────────────────────────────────
-async def fetch_papers_with_code():
+async def fetch_crossref_trending():
     try:
+        month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m')
         resp = requests.get(
-            'https://paperswithcode.com/api/v1/papers/',
-            params={'ordering': '-proceeding', 'items_per_page': 30},
-            timeout=15, headers=HEADERS
+            'https://api.crossref.org/works',
+            params={
+                'query': 'artificial intelligence machine learning deep learning',
+                'filter': f'from-pub-date:{month_ago},type:journal-article',
+                'sort': 'is-referenced-by-count',
+                'order': 'desc',
+                'rows': 30,
+                'select': 'DOI,title,is-referenced-by-count,abstract',
+            },
+            timeout=20, headers=HEADERS
         )
         if resp.status_code != 200:
-            print(f'❌ PapersWithCode API: {resp.status_code}')
+            print(f'❌ Crossref API: {resp.status_code}')
             return []
 
         data = resp.json()
-        results = data.get('results', data) if isinstance(data, dict) else data
+        items = data.get('message', {}).get('items', [])
 
         papers = []
-        for p in (results if isinstance(results, list) else []):
+        for item in items:
+            doi = item.get('DOI', '')
+            titles = item.get('title', [])
+            title = titles[0] if titles else ''
+            citations = item.get('is-referenced-by-count', 0)
+            abstract = item.get('abstract', '')
+
+            # DOI에서 arXiv ID 추출 시도
             arxiv_id = ''
-            if p.get('arxiv_id'):
-                arxiv_id = p['arxiv_id']
-            elif p.get('url_abs') and 'arxiv.org' in str(p['url_abs']):
-                match = re.search(r'(\d{4}\.\d{4,5})', str(p['url_abs']))
+            if '10.48550/arxiv.' in doi.lower():
+                arxiv_id = doi.split('.')[-1]
+            elif 'arxiv' in doi.lower():
+                match = re.search(r'(\d{4}\.\d{4,5})', doi)
                 if match:
                     arxiv_id = match.group(1)
 
-            if not arxiv_id:
+            if not arxiv_id or len(arxiv_id) < 5:
                 continue
 
-            stars = p.get('repository_count', 0) or p.get('stars', 0) or 0
             papers.append({
                 'arxiv_id': arxiv_id,
-                'title': p.get('title', ''),
-                'abstract': (p.get('abstract') or '')[:2000],
-                'upvotes': stars * 3,  # Weight GitHub stars
-                'source': 'papers_with_code',
+                'title': title,
+                'abstract': abstract[:2000] if abstract else '',
+                'upvotes': min(citations * 2, 200),  # 인용수 기반
+                'source': 'crossref',
             })
 
-        print(f'✅ Papers With Code: {len(papers)}개')
+        print(f'✅ Crossref: {len(papers)}개')
         return papers
     except Exception as e:
-        print(f'❌ Papers With Code 실패: {e}')
+        print(f'❌ Crossref 실패: {e}')
         return []
 
 
@@ -317,13 +323,13 @@ async def main():
 
     # 2. 다중 소스 trending 수집 (병렬)
     print('\n🔥 Step 2: 다중 소스 Trending 수집...')
-    hf_papers, ss_papers, pwc_papers = await asyncio.gather(
+    hf_papers, rss_papers, crossref_papers = await asyncio.gather(
         fetch_hf_trending(),
-        fetch_semantic_scholar(),
-        fetch_papers_with_code(),
+        fetch_arxiv_rss(),
+        fetch_crossref_trending(),
     )
 
-    all_trending = hf_papers + ss_papers + pwc_papers
+    all_trending = hf_papers + rss_papers + crossref_papers
 
     # trending 논문 중 DB에 없는 것 저장
     for p in all_trending:
@@ -353,7 +359,7 @@ async def main():
     print(f'   전체 논문: {total}개')
     print(f'   신규 추가: {new_count}개')
     print(f'   오늘 Trending: {trending_count}개')
-    print(f'   Active Sources: HuggingFace({len(hf_papers)}), Semantic Scholar({len(ss_papers)}), PapersWithCode({len(pwc_papers)})')
+    print(f'   Active Sources: HuggingFace({len(hf_papers)}), arXiv RSS({len(rss_papers)}), Crossref({len(crossref_papers)})')
     print(f'{"="*60}')
 
     await conn.close()
