@@ -7,6 +7,7 @@ from .paper import Paper, Author, PaperAuthor, Concept, PaperConcept
 from .graph import GraphNode, GraphEdge
 from .workspace import UserNote, ResearchQuestion, Collection, Comparison, Explanation
 from .trending import TrendingPaper
+from .summary import PaperSummary, SummaryFeedback
 
 __all__ = [
     # Base classes
@@ -34,4 +35,8 @@ __all__ = [
 
     # Trending models
     "TrendingPaper",
+
+    # Summary models
+    "PaperSummary",
+    "SummaryFeedback",
 ]

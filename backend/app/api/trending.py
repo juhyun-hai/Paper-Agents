@@ -14,6 +14,9 @@ from ..schemas.papers import PaperResponse
 
 router = APIRouter(prefix="/api/trending", tags=["Trending"])
 
+# Also create a separate router for /api/hot-topics (used by frontend HotTopics component)
+hot_topics_router = APIRouter(tags=["HotTopics"])
+
 
 def _parse_sources(sources_str):
     """Parse sources field - could be JSON array string or comma-separated."""
@@ -291,3 +294,62 @@ async def get_trending_stats(session: AsyncSession = Depends(get_async_session))
             "collection_active": False,
             "error": str(e)
         }
+
+
+SOURCE_DISPLAY = {
+    'huggingface': 'HuggingFace Papers',
+    'arxiv_rss': 'arXiv RSS',
+    'crossref': 'Crossref',
+}
+
+
+@hot_topics_router.get("/api/hot-topics")
+async def get_hot_topics(
+    days: int = Query(1, le=7),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get hot topics for the HotTopics frontend component."""
+    try:
+        since = date.today() - timedelta(days=days)
+
+        result = await session.execute(
+            select(TrendingPaper)
+            .where(TrendingPaper.date >= since)
+            .order_by(TrendingPaper.final_score.desc())
+            .limit(9)
+        )
+        trending = result.scalars().all()
+
+        topics = []
+        for tp in trending:
+            paper_result = await session.execute(
+                select(Paper).where(Paper.arxiv_id == tp.arxiv_id)
+            )
+            paper = paper_result.scalar_one_or_none()
+
+            sources = _parse_sources(tp.sources)
+            primary_source = SOURCE_DISPLAY.get(sources[0], sources[0]) if sources else 'arXiv'
+
+            abstract = (paper.abstract or '') if paper else ''
+            # Strip arXiv announce prefix
+            if 'Abstract:' in abstract:
+                abstract = abstract.split('Abstract:', 1)[1].strip()
+
+            topics.append({
+                "id": tp.id,
+                "source": primary_source,
+                "date": tp.date.isoformat() if tp.date else '',
+                "tech_name": None,
+                "title": tp.title or (paper.title if paper else ''),
+                "summary": abstract[:400],
+                "key_results": '',
+                "upvotes": int(tp.trending_score or 0),
+                "paper_url": f"https://arxiv.org/abs/{tp.arxiv_id}",
+                "github_url": None,
+                "hf_url": f"https://huggingface.co/papers/{tp.arxiv_id}" if 'huggingface' in sources else None,
+            })
+
+        return {"topics": topics}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

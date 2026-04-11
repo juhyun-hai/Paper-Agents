@@ -43,6 +43,7 @@ class Paper(Base, TimestampMixin):
     paper_concepts = relationship("PaperConcept", back_populates="paper", cascade="all, delete-orphan")
     paper_authors = relationship("PaperAuthor", back_populates="paper", cascade="all, delete-orphan")
     explanations = relationship("Explanation", back_populates="paper", cascade="all, delete-orphan")
+    summaries = relationship("PaperSummary", back_populates="paper", cascade="all, delete-orphan")
 
     # Constraints
     __table_args__ = (

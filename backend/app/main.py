@@ -2,7 +2,11 @@
 Research Intelligence Platform - Main FastAPI Application
 """
 
+import os
 import time
+
+# Use project-local HF cache (system cache is root-owned)
+os.environ.setdefault("HF_HOME", os.path.join(os.path.dirname(__file__), "..", "hf_cache"))
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +17,7 @@ from .core.database import check_db_connection, init_db
 from .api.research import router as research_router
 from .api.graph import router as graph_router
 from .api.papers import router as papers_router
-from .api.trending import router as trending_router
+from .api.trending import router as trending_router, hot_topics_router
 
 
 @asynccontextmanager
@@ -172,6 +176,7 @@ app.include_router(research_router)
 app.include_router(graph_router)
 app.include_router(papers_router)
 app.include_router(trending_router)
+app.include_router(hot_topics_router)
 
 
 # Root endpoints
