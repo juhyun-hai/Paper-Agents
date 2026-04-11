@@ -18,6 +18,7 @@ from .api.research import router as research_router
 from .api.graph import router as graph_router
 from .api.papers import router as papers_router
 from .api.trending import router as trending_router, hot_topics_router
+from .api.summary import router as summary_router
 
 
 @asynccontextmanager
@@ -177,6 +178,7 @@ app.include_router(graph_router)
 app.include_router(papers_router)
 app.include_router(trending_router)
 app.include_router(hot_topics_router)
+app.include_router(summary_router)
 
 
 # Root endpoints
