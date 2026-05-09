@@ -200,7 +200,7 @@ export default function Home() {
               About SNU HAI Lab
             </h2>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-              HAI Lab은 <strong>Manufacturing AI</strong>, <strong>physics-informed ML</strong>, <strong>embodied robotics</strong>, <strong>foundation models</strong>까지 자율 지능 시스템 전반을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
+              HAI Lab은 <strong>Manufacturing AI</strong>, <strong>physics-informed ML</strong>, <strong>physical AI</strong>, <strong>foundation models</strong>까지 자율 지능 시스템 전반을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <a
@@ -210,12 +210,6 @@ export default function Home() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 Visit HAI Lab Website →
-              </a>
-              <a
-                href="mailto:bdyoun@snu.ac.kr"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-              >
-                Research Inquiry
               </a>
             </div>
           </div>
