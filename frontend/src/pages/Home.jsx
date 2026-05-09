@@ -16,7 +16,7 @@ const FEATURES = [
   {
     icon: '🤖',
     title: 'AI 요약',
-    desc: 'Claude Opus가 직접 분석한 한국어 논문 요약. 핵심 기여도, 방법론, 결과를 한눈에.',
+    desc: '논문의 핵심 기여도, 방법론, 결과를 한눈에 볼 수 있는 한국어 요약.',
   },
   {
     icon: '🔥',
@@ -104,7 +104,7 @@ export default function Home() {
           </h1>
 
           <p className="text-lg sm:text-xl text-blue-100 max-w-2xl mx-auto leading-relaxed">
-            매일 <span className="font-semibold text-yellow-200">Top 25</span>편을 엄선해 Claude Opus가 직접 분석한 한국어 요약과 핵심 그림·표를 제공합니다.
+            매일 <span className="font-semibold text-yellow-200">Top 25</span>편을 엄선해 한국어 요약과 핵심 그림·표를 제공합니다.
           </p>
 
           <div className="max-w-2xl mx-auto">

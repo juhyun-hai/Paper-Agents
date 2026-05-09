@@ -111,7 +111,7 @@ const PaperSummary = ({ arxivId, paper }) => {
           <div className="flex items-center space-x-3">
             <span className="text-2xl">🤖</span>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Claude AI 요약</h2>
+              <h2 className="text-xl font-semibold text-gray-900">AI 요약</h2>
               <div className="flex items-center space-x-4 text-sm text-gray-500">
                 {summary.generated_at && (
                   <span>생성일: {new Date(summary.generated_at).toLocaleDateString('ko-KR')}</span>
@@ -119,9 +119,6 @@ const PaperSummary = ({ arxivId, paper }) => {
                 {summary.word_count && (
                   <span>단어 수: {summary.word_count?.toLocaleString()}</span>
                 )}
-                <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
-                  {summary.generation_model || 'Claude Sonnet 4'}
-                </span>
               </div>
             </div>
           </div>
