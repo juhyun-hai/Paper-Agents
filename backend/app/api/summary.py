@@ -308,6 +308,7 @@ class SaveSummaryRequest(BaseModel):
     arxiv_id: str
     summary_text: str
     generation_model: str = "Claude Opus 4 (remote)"
+    figures: Optional[list] = None  # Optional list of figure dicts (base64-encoded PNGs + captions)
 
 
 @router.get("/unsummarized/list")
@@ -342,6 +343,28 @@ async def get_unsummarized_papers(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/extract-figures/{arxiv_id}")
+async def extract_paper_figures(
+    arxiv_id: str,
+    max_figures: int = 5,
+):
+    """Download the arXiv PDF and return up to N figures (base64 PNG + caption).
+
+    This endpoint is intended for the daily summary trigger so it can attach
+    figures to each generated summary.
+    """
+    try:
+        from ..services.figure_extractor import extract_figures
+        figures = extract_figures(arxiv_id, max_figures=max_figures)
+        return {
+            "arxiv_id": arxiv_id,
+            "figure_count": len(figures),
+            "figures": figures,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/save")
 async def save_summary(
     req: SaveSummaryRequest,
@@ -363,13 +386,24 @@ async def save_summary(
         )
         existing = existing_result.scalar_one_or_none()
 
+        figures = req.figures or []
+        figure_count = len(figures)
+
         if existing:
             existing.summary_text = req.summary_text
             existing.summary_type = "comprehensive"
             existing.generation_model = req.generation_model
             existing.word_count = word_count
+            if figures:
+                existing.figures = figures
+                existing.figure_count = figure_count
             await session.commit()
-            return {"status": "updated", "arxiv_id": req.arxiv_id, "word_count": word_count}
+            return {
+                "status": "updated",
+                "arxiv_id": req.arxiv_id,
+                "word_count": word_count,
+                "figure_count": figure_count,
+            }
         else:
             summary = PaperSummary(
                 paper_id=paper.id,
@@ -377,13 +411,19 @@ async def save_summary(
                 summary_text=req.summary_text,
                 summary_type="comprehensive",
                 generation_model=req.generation_model,
+                figures=figures,
                 word_count=word_count,
-                figure_count=0,
+                figure_count=figure_count,
                 has_full_text=False,
             )
             session.add(summary)
             await session.commit()
-            return {"status": "created", "arxiv_id": req.arxiv_id, "word_count": word_count}
+            return {
+                "status": "created",
+                "arxiv_id": req.arxiv_id,
+                "word_count": word_count,
+                "figure_count": figure_count,
+            }
 
     except HTTPException:
         raise

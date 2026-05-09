@@ -59,3 +59,13 @@ Thumbs.db
 # Test files
 test_*.py
 debug_*.html
+
+# Local artifacts (not part of the project)
+backend/_wip_summary/
+backend/hf_cache/
+backend/logs/
+.wrangler/
+cloudflared
+ngrok.tgz
+=*
+.claude/

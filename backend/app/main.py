@@ -17,7 +17,12 @@ from .core.database import check_db_connection, init_db
 from .api.research import router as research_router
 from .api.graph import router as graph_router
 from .api.papers import router as papers_router
-from .api.trending import router as trending_router, hot_topics_router
+from .api.trending import (
+    router as trending_router,
+    hot_topics_router,
+    featured_router,
+    hai_router,
+)
 from .api.summary import router as summary_router
 
 
@@ -179,6 +184,8 @@ app.include_router(papers_router)
 app.include_router(trending_router)
 app.include_router(hot_topics_router)
 app.include_router(summary_router)
+app.include_router(featured_router)
+app.include_router(hai_router)
 
 
 # Root endpoints

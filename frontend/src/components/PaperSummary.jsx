@@ -145,6 +145,52 @@ const PaperSummary = ({ arxivId, paper }) => {
         </ReactMarkdown>
       </div>
 
+      {/* Figures & Tables */}
+      {Array.isArray(summary.figures) && summary.figures.length > 0 && (
+        <div className="mt-10 pt-8 border-t border-gray-200">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            🖼️ 핵심 그림 / 표
+            <span className="text-sm font-normal text-gray-500">({summary.figures.length})</span>
+          </h3>
+          <div className="space-y-6">
+            {summary.figures.map((fig, i) => {
+              const src = fig.data
+                ? `data:${fig.mime || 'image/png'};base64,${fig.data}`
+                : null;
+              return (
+                <figure
+                  key={fig.id || i}
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-4"
+                >
+                  {src && (
+                    <img
+                      src={src}
+                      alt={fig.caption || `Figure ${fig.number || i + 1}`}
+                      className="w-full max-h-[600px] object-contain bg-white rounded-lg"
+                      loading="lazy"
+                    />
+                  )}
+                  {fig.caption && (
+                    <figcaption className="mt-3 text-sm text-gray-700 leading-relaxed">
+                      <span className="font-semibold text-gray-900">
+                        {fig.kind || 'Figure'} {fig.number || i + 1}
+                      </span>
+                      {' — '}
+                      {fig.caption.replace(/^(Figure|Fig\.?|Table|Tab\.?)\s*\d+[\.:\s]*/i, '')}
+                    </figcaption>
+                  )}
+                  {!fig.caption && fig.page && (
+                    <figcaption className="mt-2 text-xs text-gray-500">
+                      from page {fig.page}
+                    </figcaption>
+                  )}
+                </figure>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

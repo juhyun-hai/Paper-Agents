@@ -239,8 +239,16 @@ async def save_papers(conn, papers):
     return saved
 
 
-async def save_trending(conn, all_source_papers):
-    """다중 소스 통합 trending 저장."""
+async def save_trending(conn, all_source_papers, featured_top_n=25):
+    """다중 소스 통합 trending 저장 + featured 큐레이션."""
+    # HAI scoring (lazy import to keep this script standalone-runnable)
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from app.core.hai_config import is_hai_author, hai_keyword_score
+    except Exception:
+        is_hai_author = lambda _a: False
+        hai_keyword_score = lambda _t, _a: 0
+
     today = datetime.now().date()
 
     # 오늘 trending 초기화
@@ -248,16 +256,19 @@ async def save_trending(conn, all_source_papers):
 
     # 논문별 점수 통합
     paper_scores = defaultdict(lambda: {
-        'title': '', 'sources': [], 'total_score': 0.0, 'abstract': ''
+        'title': '', 'sources': [], 'total_score': 0.0, 'abstract': '',
+        'upvotes': 0,
     })
 
     for p in all_source_papers:
         aid = p['arxiv_id']
         source = p['source']
         weight = SOURCE_WEIGHTS.get(source, 1.0)
-        score = max(0.1, p.get('upvotes', 0)) * weight
+        upvotes = max(0, p.get('upvotes', 0))
+        score = max(0.1, upvotes) * weight
 
         paper_scores[aid]['total_score'] += score
+        paper_scores[aid]['upvotes'] = max(paper_scores[aid]['upvotes'], upvotes)
         if source not in paper_scores[aid]['sources']:
             paper_scores[aid]['sources'].append(source)
         if len(p.get('title', '')) > len(paper_scores[aid]['title']):
@@ -272,22 +283,66 @@ async def save_trending(conn, all_source_papers):
         elif len(data['sources']) >= 2:
             data['total_score'] *= 1.3
 
+    # featured_score = trending_score + HF_upvotes + cross_platform + HAI keywords
+    for aid, data in paper_scores.items():
+        # Pull author list from DB if we have it, for HAI tagging.
+        row = await conn.fetchrow(
+            "SELECT authors FROM papers WHERE arxiv_id = $1", aid
+        )
+        authors = []
+        if row and row['authors']:
+            try:
+                authors = (
+                    json.loads(row['authors'])
+                    if isinstance(row['authors'], str)
+                    else row['authors']
+                )
+            except Exception:
+                authors = []
+
+        hai_kw = hai_keyword_score(data['title'], data['abstract'])
+        is_hai = is_hai_author(authors) or hai_kw >= 3
+        data['hai_score'] = hai_kw + (10 if is_hai_author(authors) else 0)
+        data['is_hai'] = is_hai
+
+        # featured score (multiplicative blending — gives big boost to multi-source HAI papers)
+        featured = data['total_score']
+        featured += min(data['upvotes'], 50) * 0.5  # cap upvote contribution
+        featured += hai_kw * 1.5
+        featured += (10 if is_hai_author(authors) else 0)
+        if len(data['sources']) >= 2:
+            featured *= 1.2
+        data['featured_score'] = featured
+
     # 정렬 및 저장
-    ranked = sorted(paper_scores.items(), key=lambda x: x[1]['total_score'], reverse=True)
+    ranked = sorted(
+        paper_scores.items(),
+        key=lambda x: x[1]['featured_score'],
+        reverse=True,
+    )
 
     saved = 0
+    featured_ids = set()
     for rank, (aid, data) in enumerate(ranked[:100], 1):
+        is_featured = rank <= featured_top_n
+        if is_featured:
+            featured_ids.add(aid)
         try:
             await conn.execute("""
                 INSERT INTO trending_papers (arxiv_id, title, sources,
                                               trending_score, final_score, rank,
-                                              multi_source_bonus, date, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                                              multi_source_bonus, date, created_at,
+                                              featured_score, is_featured, is_hai,
+                                              hai_score, upvotes)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(),
+                        $9, $10, $11, $12, $13)
             """,
                 aid, data['title'], json.dumps(data['sources']),
                 data['total_score'], data['total_score'], rank,
                 1.5 if len(data['sources']) >= 3 else (1.3 if len(data['sources']) >= 2 else 1.0),
-                today
+                today,
+                data['featured_score'], is_featured, data['is_hai'],
+                data['hai_score'], data['upvotes'],
             )
             saved += 1
         except Exception as e:
@@ -298,11 +353,13 @@ async def save_trending(conn, all_source_papers):
         for s in data['sources']:
             source_counts[s] += 1
 
-    print(f'🔥 Trending 저장: {saved}개')
+    print(f'🔥 Trending 저장: {saved}개 (featured: {len(featured_ids)})')
     print(f'   소스별: {dict(source_counts)}')
     multi = sum(1 for d in paper_scores.values() if len(d['sources']) >= 2)
     print(f'   크로스 플랫폼: {multi}개 논문')
-    return saved
+    hai_count = sum(1 for d in paper_scores.values() if d.get('is_hai'))
+    print(f'   HAI 매칭: {hai_count}개 논문')
+    return saved, featured_ids
 
 
 # ──────────────────────────────────────────
@@ -342,9 +399,9 @@ async def main():
                 'arxiv_url': f'https://arxiv.org/abs/{p["arxiv_id"]}',
             }])
 
-    # 3. 통합 trending 저장
-    print('\n📊 Step 3: 통합 Trending 점수 계산...')
-    await save_trending(conn, all_trending)
+    # 3. 통합 trending 저장 + featured 큐레이션
+    print('\n📊 Step 3: 통합 Trending 점수 계산 + Featured 25개 선정...')
+    _, featured_ids = await save_trending(conn, all_trending)
 
     # 4. 통계
     total = await conn.fetchval('SELECT count(*) FROM papers')

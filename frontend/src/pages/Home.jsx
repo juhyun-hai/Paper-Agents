@@ -4,6 +4,7 @@ import SearchBar from '../components/SearchBar.jsx'
 import PaperCard from '../components/PaperCard.jsx'
 import { PaperCardSkeleton } from '../components/Skeleton.jsx'
 import HotTopics from '../components/HotTopics.jsx'
+import FeaturedSection from '../components/FeaturedSection.jsx'
 import { getStats, getTrends } from '../api/client.js'
 
 const FEATURES = [
@@ -84,10 +85,17 @@ export default function Home() {
         </div>
 
         <div className="relative max-w-5xl mx-auto px-4 py-20 sm:py-28 text-center space-y-8">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-medium">
+          <a
+            href="https://hai.snu.ac.kr/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          >
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            {stats ? `${stats.total_papers?.toLocaleString()}+ papers indexed` : 'Live updating'}
-          </div>
+            Curated by <span className="font-semibold text-yellow-200">SNU HAI Lab</span>
+            <span className="text-blue-200">·</span>
+            <span className="text-blue-100">{stats ? `${stats.total_papers?.toLocaleString()}+ papers` : 'Live updating'}</span>
+          </a>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight">
             Discover What's
@@ -96,7 +104,7 @@ export default function Home() {
           </h1>
 
           <p className="text-lg sm:text-xl text-blue-100 max-w-2xl mx-auto leading-relaxed">
-            AI가 분석하는 최신 arXiv 논문 트렌드. 한국어 요약, 유사 논문 추천, 실시간 인기 논문까지.
+            매일 <span className="font-semibold text-yellow-200">Top 25</span>편을 엄선해 Claude Opus가 직접 분석한 한국어 요약과 핵심 그림·표를 제공합니다.
           </p>
 
           <div className="max-w-2xl mx-auto">
@@ -164,6 +172,56 @@ export default function Home() {
         </div>
       </section>
 
+      {/* About SNU HAI Lab */}
+      <section className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-gray-800 dark:to-gray-900 py-12 border-y border-gray-200 dark:border-gray-700">
+        <div className="max-w-5xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+          <div className="md:col-span-1 flex flex-col items-center md:items-start gap-3">
+            <img
+              src="https://usecloud.s3-us-west-1.amazonaws.com/snu_logo.png"
+              alt="SNU"
+              className="h-16 w-16 rounded-lg bg-white p-2 shadow-md"
+              onError={(e) => { e.target.style.display = 'none' }}
+            />
+            <div>
+              <p className="text-xs uppercase tracking-wider text-blue-600 dark:text-blue-400 font-semibold">Curated by</p>
+              <a
+                href="https://hai.snu.ac.kr/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 transition-colors"
+              >
+                Hyperautonomy AI Lab
+              </a>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Seoul National University</p>
+            </div>
+          </div>
+          <div className="md:col-span-2 space-y-3">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              About SNU HAI Lab
+            </h2>
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+              HAI Lab은 <strong>Manufacturing AI</strong>, <strong>physics-informed ML</strong>, <strong>embodied robotics</strong>, <strong>foundation models</strong>까지 자율 지능 시스템 전반을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <a
+                href="https://hai.snu.ac.kr/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Visit HAI Lab Website →
+              </a>
+              <a
+                href="mailto:bdyoun@snu.ac.kr"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                Research Inquiry
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Hot Topics */}
       <section className="bg-gray-50 dark:bg-gray-900 py-16">
         <div className="max-w-5xl mx-auto px-4">
@@ -171,8 +229,30 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Today's Top 25 (Curated) */}
+      <FeaturedSection
+        endpoint="/featured/today"
+        title="🌟 Today's Top 25"
+        subtitle="HAI Lab이 매일 엄선한 임팩트 있는 논문들 — 핵심 그림과 표가 포함된 한국어 요약 제공"
+        accent="orange"
+        count={6}
+        badge="Featured"
+      />
+
+      {/* HAI Lab Picks */}
+      <section className="bg-blue-50/40 dark:bg-blue-950/10">
+        <FeaturedSection
+          endpoint="/hai/papers"
+          title="🎓 HAI Lab Picks"
+          subtitle="Manufacturing AI · Embodied Robotics · Foundation Models — HAI Lab 관심 분야"
+          accent="indigo"
+          count={6}
+          badge="HAI"
+        />
+      </section>
+
       {/* Trending Papers */}
-      <section className="max-w-5xl mx-auto px-4 py-16">
+      <section className="max-w-5xl mx-auto px-4 py-12 hidden">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🔥 Trending Papers</h2>

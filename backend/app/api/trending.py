@@ -17,6 +17,10 @@ router = APIRouter(prefix="/api/trending", tags=["Trending"])
 # Also create a separate router for /api/hot-topics (used by frontend HotTopics component)
 hot_topics_router = APIRouter(tags=["HotTopics"])
 
+# Featured / HAI Lab curation endpoints
+featured_router = APIRouter(prefix="/api/featured", tags=["Featured"])
+hai_router = APIRouter(prefix="/api/hai", tags=["HAI"])
+
 
 def _parse_sources(sources_str):
     """Parse sources field - could be JSON array string or comma-separated."""
@@ -353,3 +357,131 @@ async def get_hot_topics(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Featured / HAI Lab curated endpoints
+# ---------------------------------------------------------------------------
+async def _hydrate_with_paper(session: AsyncSession, tp: TrendingPaper):
+    paper_result = await session.execute(
+        select(Paper).where(Paper.arxiv_id == tp.arxiv_id)
+    )
+    paper = paper_result.scalar_one_or_none()
+    base = {
+        "arxiv_id": tp.arxiv_id,
+        "title": tp.title,
+        "rank": tp.rank,
+        "sources": _parse_sources(tp.sources),
+        "trending_score": tp.trending_score or 0,
+        "featured_score": getattr(tp, "featured_score", 0) or 0,
+        "is_featured": bool(getattr(tp, "is_featured", False)),
+        "is_hai": bool(getattr(tp, "is_hai", False)),
+        "hai_score": getattr(tp, "hai_score", 0) or 0,
+        "upvotes": getattr(tp, "upvotes", 0) or 0,
+        "date": tp.date.isoformat() if tp.date else None,
+    }
+    if paper:
+        base.update({
+            "id": paper.id,
+            "authors": paper.authors or [],
+            "abstract": paper.abstract or "",
+            "categories": paper.categories or [],
+            "published_date": paper.published_date.isoformat() if paper.published_date else "",
+            "pdf_url": paper.pdf_url,
+            "html_url": paper.html_url,
+        })
+    return base
+
+
+@featured_router.get("/today")
+async def get_featured_today(
+    limit: int = Query(25, le=50),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Today's curated top papers (featured by HAI Lab)."""
+    today = date.today()
+    result = await session.execute(
+        select(TrendingPaper)
+        .where(TrendingPaper.date == today, TrendingPaper.is_featured.is_(True))
+        .order_by(TrendingPaper.rank.asc())
+        .limit(limit)
+    )
+    items = [await _hydrate_with_paper(session, tp) for tp in result.scalars().all()]
+    return {
+        "papers": items,
+        "total": len(items),
+        "date": today.isoformat(),
+        "curated_by": "Hyperautonomy AI Lab, Seoul National University",
+    }
+
+
+@featured_router.get("/this-week")
+async def get_featured_this_week(
+    limit: int = Query(25, le=100),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """This week's featured papers (deduped by arxiv_id, best featured_score wins)."""
+    week_ago = date.today() - timedelta(days=7)
+    result = await session.execute(
+        select(TrendingPaper)
+        .where(
+            TrendingPaper.date >= week_ago,
+            TrendingPaper.is_featured.is_(True),
+        )
+        .order_by(TrendingPaper.featured_score.desc())
+    )
+    seen, items = set(), []
+    for tp in result.scalars().all():
+        if tp.arxiv_id in seen:
+            continue
+        seen.add(tp.arxiv_id)
+        items.append(await _hydrate_with_paper(session, tp))
+        if len(items) >= limit:
+            break
+    return {
+        "papers": items,
+        "total": len(items),
+        "period": "7_days",
+        "curated_by": "Hyperautonomy AI Lab, Seoul National University",
+    }
+
+
+@hai_router.get("/info")
+async def get_hai_info():
+    """Return SNU HAI Lab metadata for the frontend."""
+    try:
+        from ..core.hai_config import HAI_LAB_INFO, HAI_KEYWORDS
+        return {**HAI_LAB_INFO, "keywords": HAI_KEYWORDS[:20]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@hai_router.get("/papers")
+async def get_hai_papers(
+    days: int = Query(14, le=60),
+    limit: int = Query(20, le=100),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Recent papers tagged as HAI Lab relevant (member match or strong keyword match)."""
+    since = date.today() - timedelta(days=days)
+    result = await session.execute(
+        select(TrendingPaper)
+        .where(
+            TrendingPaper.date >= since,
+            TrendingPaper.is_hai.is_(True),
+        )
+        .order_by(TrendingPaper.featured_score.desc())
+    )
+    seen, items = set(), []
+    for tp in result.scalars().all():
+        if tp.arxiv_id in seen:
+            continue
+        seen.add(tp.arxiv_id)
+        items.append(await _hydrate_with_paper(session, tp))
+        if len(items) >= limit:
+            break
+    return {
+        "papers": items,
+        "total": len(items),
+        "period_days": days,
+    }

@@ -2,7 +2,7 @@
 Trending papers model for tracking daily trending papers.
 """
 
-from sqlalchemy import Column, String, Integer, Float, Date, DateTime, Text, JSON
+from sqlalchemy import Column, String, Integer, Float, Date, DateTime, Text, JSON, Boolean
 from datetime import date, datetime
 
 from .base import Base
@@ -22,6 +22,13 @@ class TrendingPaper(Base):
     multi_source_bonus = Column(Float, default=0.0)
     date = Column(Date, default=date.today)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Curation fields (added 2026-05)
+    featured_score = Column(Float, default=0.0)
+    is_featured = Column(Boolean, default=False)
+    is_hai = Column(Boolean, default=False)
+    hai_score = Column(Integer, default=0)
+    upvotes = Column(Integer, default=0)
 
     def __repr__(self):
         return f"<TrendingPaper {self.arxiv_id}: {self.title[:50]}... (rank {self.rank})>"
