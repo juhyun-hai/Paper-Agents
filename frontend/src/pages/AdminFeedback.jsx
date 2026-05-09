@@ -66,7 +66,7 @@ export default function AdminFeedback() {
             disabled={filtered.length === 0}
             className="text-xs px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-primary hover:text-primary disabled:opacity-40 transition-colors"
           >
-            {copied ? '✅ 복사됨' : '📋 Claude에 붙여넣기용 복사'}
+            {copied ? '✅ 복사됨' : '📋 전체 복사'}
           </button>
         </div>
       </div>
