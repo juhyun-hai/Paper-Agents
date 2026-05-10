@@ -50,7 +50,15 @@ function App() {
               {/* Developer */}
               <div className="text-center md:text-right">
                 <p className="text-sm">
-                  Developed by <span className="text-white font-medium">Juhyun Kim</span>
+                  Developed by{' '}
+                  <a
+                    href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white font-medium hover:text-blue-400 transition-colors"
+                  >
+                    Juhyun Kim
+                  </a>
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   © 2026 Hot Paper

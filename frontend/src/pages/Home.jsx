@@ -85,17 +85,27 @@ export default function Home() {
         </div>
 
         <div className="relative max-w-5xl mx-auto px-4 py-20 sm:py-28 text-center space-y-8">
-          <a
-            href="https://hai.snu.ac.kr/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-medium transition-colors"
-          >
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-medium">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            Curated by <span className="font-semibold text-yellow-200">SNU HAI Lab</span>
+            Curated by{' '}
+            <a
+              href="https://hai.snu.ac.kr/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-yellow-200 hover:text-yellow-100 transition-colors"
+            >
+              SNU HAI Lab
+            </a>
             <span className="text-blue-200">·</span>
-            <span className="text-blue-100">{stats ? `${stats.total_papers?.toLocaleString()}+ papers` : 'Live updating'}</span>
-          </a>
+            <a
+              href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-100 hover:text-white transition-colors"
+            >
+              by Juhyun Kim
+            </a>
+          </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight">
             Discover What's
@@ -201,6 +211,18 @@ export default function Home() {
             </h2>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
               HAI Lab은 <strong>Manufacturing AI</strong>, <strong>physics-informed ML</strong>, <strong>physical AI</strong>, <strong>foundation models</strong>까지 자율 지능 시스템 전반을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed pt-1">
+              Built and maintained by{' '}
+              <a
+                href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
+              >
+                Juhyun Kim
+              </a>
+              , Ph.D. student at HAI Lab.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <a
