@@ -301,7 +301,9 @@ async def save_trending(conn, all_source_papers, featured_top_n=25):
                 authors = []
 
         hai_kw = hai_keyword_score(data['title'], data['abstract'])
-        is_hai = is_hai_author(authors) or hai_kw >= 3
+        # Tighter threshold: industrial keywords are specific, so 2 strong hits
+        # (or 1 title hit) qualifies. Member match always qualifies.
+        is_hai = is_hai_author(authors) or hai_kw >= 2
         data['hai_score'] = hai_kw + (10 if is_hai_author(authors) else 0)
         data['is_hai'] = is_hai
 

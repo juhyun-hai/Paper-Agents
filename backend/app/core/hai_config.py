@@ -28,34 +28,33 @@ HAI_LAB_MEMBERS: List[str] = [
 # Lab research interest keywords (broad: manufacturing AI + LLM/Agent)
 # ---------------------------------------------------------------------------
 HAI_KEYWORDS: List[str] = [
-    # Manufacturing / Industrial AI (per hai.snu.ac.kr)
-    "manufacturing", "industrial ai", "smart factory",
-    "physics-informed", "physics informed",
-    "fault diagnosis", "anomaly detection",
-    "remaining useful life", "rul prediction",
-    "battery", "semiconductor reliability",
-    "digital twin", "predictive maintenance",
-    "condition monitoring", "prognostics",
+    # Manufacturing / Industrial AI (HAI Lab core focus)
+    "manufacturing", "manufacturing ai", "industrial ai", "industrial",
+    "smart factory", "smart manufacturing",
+    "physics-informed", "physics informed", "physics-based",
+    "physics-informed neural", "pinn",
+    "fault diagnosis", "fault detection", "fault prediction",
+    "anomaly detection",
+    "remaining useful life", "rul",
+    "prognostics", "phm", "prognostics and health management",
+    "predictive maintenance", "condition monitoring",
+    "digital twin", "digital twins",
 
-    # Robotics / Embodied AI
-    "embodied ai", "robotics", "quadruped",
-    "manipulation", "navigation",
-    "sim-to-real", "robot learning",
+    # Specific hardware / process / domains
+    "battery", "lithium-ion", "battery degradation",
+    "semiconductor", "wafer", "lithography", "cmp",
+    "bearing", "rotating machinery", "vibration",
+    "additive manufacturing", "3d printing",
+    "structural health monitoring", "shm",
 
-    # Foundation models / LLM / Agents
-    "foundation model", "large language model", "llm",
-    "agent", "agentic", "multi-agent",
-    "reasoning", "chain-of-thought", "tool use",
-    "rag", "retrieval-augmented",
-    "alignment", "rlhf",
+    # Reliability & robustness for engineering systems
+    "reliability", "uncertainty quantification", "surrogate model",
+    "engineering design", "design optimization",
+    "model-based", "scientific machine learning",
 
-    # Multimodal / Vision-language
-    "vision-language", "vlm", "multimodal",
-    "image understanding", "video understanding",
-
-    # Generative / Diffusion
-    "diffusion model", "generative model", "text-to-image",
-    "video generation", "world model",
+    # Embodied / robotics for industrial use
+    "industrial robot", "quadruped", "manipulation",
+    "robot learning", "sim-to-real",
 ]
 
 
