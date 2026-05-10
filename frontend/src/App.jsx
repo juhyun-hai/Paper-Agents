@@ -5,6 +5,7 @@ import Navigation from './components/Navigation';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Paper from './pages/Paper';
+import HaiPapers from './pages/HaiPapers';
 import './App.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
             <Route path="/trending" element={<TrendingPapers />} />
             <Route path="/search" element={<Search />} />
             <Route path="/paper/:arxiv_id" element={<Paper />} />
+            <Route path="/hai" element={<HaiPapers />} />
           </Routes>
         </main>
 

@@ -260,10 +260,11 @@ export default function Home() {
         <FeaturedSection
           endpoint="/hai/papers"
           title="🎓 HAI Lab Picks"
-          subtitle="Manufacturing AI · Embodied Robotics · Foundation Models — HAI Lab 관심 분야"
+          subtitle="Manufacturing AI · Physics-Informed ML · Fault Diagnosis · Digital Twin — HAI Lab 관심 분야"
           accent="indigo"
           count={6}
           badge="HAI"
+          viewAllPath="/hai"
         />
       </section>
 

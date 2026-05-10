@@ -22,6 +22,7 @@ export default function FeaturedSection({
   accent = 'blue',
   count = 6,
   badge = null,
+  viewAllPath = '/trending',
 }) {
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export default function FeaturedSection({
           )}
         </div>
         <Link
-          to="/trending"
+          to={viewAllPath}
           className={`text-sm ${accentBg} text-white px-4 py-2 rounded-lg transition-colors`}
         >
           View All →
