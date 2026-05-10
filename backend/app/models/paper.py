@@ -37,6 +37,8 @@ class Paper(Base, TimestampMixin):
     # HAI Lab tagging
     is_hai: Mapped[bool] = mapped_column(default=False, nullable=False)
     hai_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    hai_topic: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    is_lab_publication: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Vector embeddings
     title_embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(1024), nullable=True)

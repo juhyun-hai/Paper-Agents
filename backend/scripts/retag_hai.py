@@ -13,7 +13,7 @@ import sys
 import asyncpg
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from app.core.hai_config import is_hai_author, hai_keyword_score
+from app.core.hai_config import is_hai_author, hai_keyword_score, hai_topic
 
 DB_URL = 'postgresql://research_agent:research_pass_2024@localhost:5432/research_intelligence'
 
@@ -41,9 +41,10 @@ async def main():
             kw = hai_keyword_score(row['title'] or '', row['abstract'] or '')
             is_hai = is_hai_author(authors) or kw >= 2
             score = kw + (10 if is_hai_author(authors) else 0)
+            topic = hai_topic(row['title'] or '', row['abstract'] or '') if is_hai else None
             await conn.execute(
-                "UPDATE papers SET is_hai = $1, hai_score = $2 WHERE id = $3",
-                is_hai, score, row['id'],
+                "UPDATE papers SET is_hai = $1, hai_score = $2, hai_topic = $3 WHERE id = $4",
+                is_hai, score, topic, row['id'],
             )
             p_updated += 1
             if is_hai:

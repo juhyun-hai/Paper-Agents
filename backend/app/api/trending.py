@@ -458,22 +458,35 @@ async def get_hai_info():
 
 @hai_router.get("/papers")
 async def get_hai_papers(
-    limit: int = Query(20, le=100),
+    limit: int = Query(20, le=200),
+    topic: Optional[str] = Query(None, description="Filter by hai_topic key"),
+    source: Optional[str] = Query(None, description="'arxiv' or 'lab' (HAI Lab publications)"),
+    sort: str = Query("score", regex="^(score|recent)$"),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Papers tagged as HAI Lab relevant (member match or industrial-AI keyword match).
+    """Papers tagged as HAI Lab relevant.
 
-    Pulls from the full papers table — not just trending — so the HAI Picks
-    section reflects the lab's actual research focus rather than what happens
-    to be popular on HuggingFace today.
+    Combines arXiv papers matched by HAI keywords + Prof. Youn's published
+    papers fetched from OpenAlex. Filters: topic, source, sort.
     """
-    result = await session.execute(
-        select(Paper)
-        .where(Paper.is_hai.is_(True))
-        .order_by(Paper.hai_score.desc(), Paper.published_date.desc().nullslast())
-        .limit(limit)
-    )
+    stmt = select(Paper).where(Paper.is_hai.is_(True))
+
+    if topic:
+        stmt = stmt.where(Paper.hai_topic == topic)
+    if source == "lab":
+        stmt = stmt.where(Paper.is_lab_publication.is_(True))
+    elif source == "arxiv":
+        stmt = stmt.where(Paper.is_lab_publication.is_(False))
+
+    if sort == "recent":
+        stmt = stmt.order_by(Paper.published_date.desc().nullslast(), Paper.hai_score.desc())
+    else:
+        stmt = stmt.order_by(Paper.hai_score.desc(), Paper.published_date.desc().nullslast())
+    stmt = stmt.limit(limit)
+
+    result = await session.execute(stmt)
     papers = result.scalars().all()
+
     items = []
     for p in papers:
         items.append({
@@ -481,15 +494,50 @@ async def get_hai_papers(
             "arxiv_id": p.arxiv_id,
             "title": p.title,
             "authors": p.authors or [],
-            "abstract": p.abstract or "",
+            "abstract": (p.abstract or "")[:600],
             "categories": p.categories or [],
             "published_date": p.published_date.isoformat() if p.published_date else "",
+            "year": p.year,
+            "venue": p.venue,
+            "citation_count": p.citation_count or 0,
             "pdf_url": p.pdf_url,
             "html_url": p.html_url,
             "hai_score": p.hai_score or 0,
+            "hai_topic": p.hai_topic,
             "is_hai": True,
+            "is_lab_publication": bool(getattr(p, "is_lab_publication", False)),
         })
-    return {
-        "papers": items,
-        "total": len(items),
-    }
+    return {"papers": items, "total": len(items)}
+
+
+@hai_router.get("/topics")
+async def get_hai_topics(session: AsyncSession = Depends(get_async_session)):
+    """Topic distribution for the HAI Lab Picks page filter chips."""
+    from sqlalchemy import func
+    from ..core.hai_config import TOPIC_DISPLAY
+
+    arxiv_q = await session.execute(
+        select(Paper.hai_topic, func.count(Paper.id))
+        .where(Paper.is_hai.is_(True), Paper.is_lab_publication.is_(False))
+        .group_by(Paper.hai_topic)
+    )
+    lab_q = await session.execute(
+        select(Paper.hai_topic, func.count(Paper.id))
+        .where(Paper.is_hai.is_(True), Paper.is_lab_publication.is_(True))
+        .group_by(Paper.hai_topic)
+    )
+    arxiv_counts = {row[0] or "other": row[1] for row in arxiv_q.all()}
+    lab_counts = {row[0] or "other": row[1] for row in lab_q.all()}
+
+    topics = []
+    all_keys = set(arxiv_counts) | set(lab_counts) | set(TOPIC_DISPLAY)
+    for k in all_keys:
+        topics.append({
+            "key": k,
+            "label": TOPIC_DISPLAY.get(k, k.replace("-", " ").title() if k else "Other"),
+            "arxiv_count": int(arxiv_counts.get(k, 0)),
+            "lab_count": int(lab_counts.get(k, 0)),
+            "total": int(arxiv_counts.get(k, 0)) + int(lab_counts.get(k, 0)),
+        })
+    topics.sort(key=lambda x: -x["total"])
+    return {"topics": topics}

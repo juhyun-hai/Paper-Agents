@@ -117,6 +117,75 @@ def hai_keyword_score(title: str, abstract: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Topic classification — group HAI papers into broader research themes for
+# filtering on the /hai page.
+# ---------------------------------------------------------------------------
+HAI_TOPICS = {
+    "physics-informed": [
+        "physics-informed", "physics informed", "physics-based",
+        "pinn", "scientific machine learning",
+    ],
+    "fault-diagnosis": [
+        "fault diagnosis", "fault detection", "fault prediction",
+        "anomaly detection", "condition monitoring",
+    ],
+    "rul-phm": [
+        "remaining useful life", "rul", "prognostics", "phm",
+        "predictive maintenance",
+    ],
+    "digital-twin": [
+        "digital twin", "digital twins",
+    ],
+    "battery": [
+        "battery", "lithium-ion", "battery degradation",
+    ],
+    "semiconductor": [
+        "semiconductor", "wafer", "lithography", "cmp",
+    ],
+    "manufacturing": [
+        "manufacturing", "manufacturing ai", "smart factory",
+        "smart manufacturing", "additive manufacturing", "3d printing",
+    ],
+    "robotics": [
+        "industrial robot", "quadruped", "manipulation",
+        "robot learning", "sim-to-real",
+    ],
+    "reliability": [
+        "reliability", "uncertainty quantification", "surrogate model",
+        "structural health monitoring", "shm", "bearing",
+        "rotating machinery", "vibration",
+    ],
+}
+
+TOPIC_DISPLAY = {
+    "physics-informed": "Physics-Informed ML",
+    "fault-diagnosis": "Fault Diagnosis",
+    "rul-phm": "RUL / Prognostics",
+    "digital-twin": "Digital Twin",
+    "battery": "Battery",
+    "semiconductor": "Semiconductor",
+    "manufacturing": "Manufacturing AI",
+    "robotics": "Industrial Robotics",
+    "reliability": "Reliability / SHM",
+}
+
+
+def hai_topic(title: str, abstract: str) -> str:
+    """Pick the best-matching HAI topic for a paper. Returns topic key or
+    "other"."""
+    blob = _normalize((title or "") + " " + (abstract or ""))
+    best, best_score = None, 0
+    for topic, keys in HAI_TOPICS.items():
+        s = 0
+        for k in keys:
+            if re.search(r"\b" + re.escape(_normalize(k)) + r"\b", blob):
+                s += 1
+        if s > best_score:
+            best, best_score = topic, s
+    return best or "other"
+
+
+# ---------------------------------------------------------------------------
 # Lab metadata for frontend display
 # ---------------------------------------------------------------------------
 HAI_LAB_INFO = {
