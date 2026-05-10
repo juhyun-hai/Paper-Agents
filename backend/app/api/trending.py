@@ -458,30 +458,38 @@ async def get_hai_info():
 
 @hai_router.get("/papers")
 async def get_hai_papers(
-    days: int = Query(14, le=60),
     limit: int = Query(20, le=100),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Recent papers tagged as HAI Lab relevant (member match or strong keyword match)."""
-    since = date.today() - timedelta(days=days)
+    """Papers tagged as HAI Lab relevant (member match or industrial-AI keyword match).
+
+    Pulls from the full papers table — not just trending — so the HAI Picks
+    section reflects the lab's actual research focus rather than what happens
+    to be popular on HuggingFace today.
+    """
     result = await session.execute(
-        select(TrendingPaper)
-        .where(
-            TrendingPaper.date >= since,
-            TrendingPaper.is_hai.is_(True),
-        )
-        .order_by(TrendingPaper.featured_score.desc())
+        select(Paper)
+        .where(Paper.is_hai.is_(True))
+        .order_by(Paper.hai_score.desc(), Paper.published_date.desc().nullslast())
+        .limit(limit)
     )
-    seen, items = set(), []
-    for tp in result.scalars().all():
-        if tp.arxiv_id in seen:
-            continue
-        seen.add(tp.arxiv_id)
-        items.append(await _hydrate_with_paper(session, tp))
-        if len(items) >= limit:
-            break
+    papers = result.scalars().all()
+    items = []
+    for p in papers:
+        items.append({
+            "id": p.id,
+            "arxiv_id": p.arxiv_id,
+            "title": p.title,
+            "authors": p.authors or [],
+            "abstract": p.abstract or "",
+            "categories": p.categories or [],
+            "published_date": p.published_date.isoformat() if p.published_date else "",
+            "pdf_url": p.pdf_url,
+            "html_url": p.html_url,
+            "hai_score": p.hai_score or 0,
+            "is_hai": True,
+        })
     return {
         "papers": items,
         "total": len(items),
-        "period_days": days,
     }

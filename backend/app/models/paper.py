@@ -34,6 +34,10 @@ class Paper(Base, TimestampMixin):
     published_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # HAI Lab tagging
+    is_hai: Mapped[bool] = mapped_column(default=False, nullable=False)
+    hai_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     # Vector embeddings
     title_embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(1024), nullable=True)
     abstract_embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(1024), nullable=True)
