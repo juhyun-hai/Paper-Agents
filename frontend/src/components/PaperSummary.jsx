@@ -151,8 +151,11 @@ const PaperSummary = ({ arxivId, paper }) => {
           </h3>
           <div className="space-y-6">
             {summary.figures.map((fig, i) => {
+              // Some legacy entries store the full data URI; new ones store raw base64.
               const src = fig.data
-                ? `data:${fig.mime || 'image/png'};base64,${fig.data}`
+                ? (fig.data.startsWith('data:')
+                    ? fig.data
+                    : `data:${fig.mime || 'image/png'};base64,${fig.data}`)
                 : null;
               return (
                 <figure
