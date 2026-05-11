@@ -61,13 +61,9 @@ function HaiPaperCard({ paper }) {
         </p>
       )}
 
-      {paper.abstract ? (
+      {paper.abstract && (
         <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
           {paper.abstract}
-        </p>
-      ) : isLab && (
-        <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1.5 mt-2 leading-relaxed">
-          ℹ️ 출판사 저작권으로 abstract 표시 제한 — 원문은 위 링크 클릭
         </p>
       )}
     </article>

@@ -28,6 +28,14 @@ HAI_LAB_MEMBERS: List[str] = [
 # Lab research interest keywords (broad: manufacturing AI + LLM/Agent)
 # ---------------------------------------------------------------------------
 HAI_KEYWORDS: List[str] = [
+    # Industrial Foundation Models & Physical AI (lab strategic direction).
+    # Multi-word terms only — single-word "llm"/"vlm" matched too many generic
+    # arXiv papers and flooded HAI Picks.
+    "industrial foundation model", "manufacturing foundation model",
+    "industrial physical ai", "physical ai",
+    "embodied ai", "world model",
+    "foundation model for manufacturing", "foundation model for industrial",
+
     # Manufacturing / Industrial AI (HAI Lab core focus)
     "manufacturing", "manufacturing ai", "industrial ai", "industrial",
     "smart factory", "smart manufacturing",
@@ -40,10 +48,14 @@ HAI_KEYWORDS: List[str] = [
     "predictive maintenance", "condition monitoring",
     "digital twin", "digital twins",
 
+    # Signal processing
+    "signal processing", "vibration", "spectral",
+    "wavelet", "frequency domain", "time-frequency",
+
     # Specific hardware / process / domains
     "battery", "lithium-ion", "battery degradation",
     "semiconductor", "wafer", "lithography", "cmp",
-    "bearing", "rotating machinery", "vibration",
+    "bearing", "rotating machinery",
     "additive manufacturing", "3d printing",
     "structural health monitoring", "shm",
 
@@ -121,6 +133,14 @@ def hai_keyword_score(title: str, abstract: str) -> int:
 # filtering on the /hai page.
 # ---------------------------------------------------------------------------
 HAI_TOPICS = {
+    "foundation-models": [
+        "industrial foundation model", "manufacturing foundation model",
+        "foundation model for manufacturing", "foundation model for industrial",
+    ],
+    "physical-ai": [
+        "physical ai", "industrial physical ai",
+        "embodied ai", "world model", "sim-to-real", "robot learning",
+    ],
     "physics-informed": [
         "physics-informed", "physics informed", "physics-based",
         "pinn", "scientific machine learning",
@@ -132,6 +152,10 @@ HAI_TOPICS = {
     "rul-phm": [
         "remaining useful life", "rul", "prognostics", "phm",
         "predictive maintenance",
+    ],
+    "signal-processing": [
+        "signal processing", "vibration", "spectral",
+        "wavelet", "frequency domain", "time-frequency",
     ],
     "digital-twin": [
         "digital twin", "digital twins",
@@ -148,19 +172,21 @@ HAI_TOPICS = {
     ],
     "robotics": [
         "industrial robot", "quadruped", "manipulation",
-        "robot learning", "sim-to-real",
     ],
     "reliability": [
         "reliability", "uncertainty quantification", "surrogate model",
         "structural health monitoring", "shm", "bearing",
-        "rotating machinery", "vibration",
+        "rotating machinery",
     ],
 }
 
 TOPIC_DISPLAY = {
+    "foundation-models": "Foundation Models",
+    "physical-ai": "Physical AI",
     "physics-informed": "Physics-Informed ML",
     "fault-diagnosis": "Fault Diagnosis",
     "rul-phm": "RUL / Prognostics",
+    "signal-processing": "Signal Processing",
     "digital-twin": "Digital Twin",
     "battery": "Battery",
     "semiconductor": "Semiconductor",
