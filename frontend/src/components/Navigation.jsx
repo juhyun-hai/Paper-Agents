@@ -72,7 +72,7 @@ const Navigation = () => {
                 </a>
               </div>
               <div>
-                by{' '}
+                Developed by{' '}
                 <a
                   href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
                   target="_blank"
@@ -147,7 +147,7 @@ const Navigation = () => {
                   </a>
                 </div>
                 <div>
-                  by{' '}
+                  Developed by{' '}
                   <a
                     href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
                     target="_blank"
