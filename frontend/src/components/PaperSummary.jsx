@@ -125,6 +125,24 @@ const PaperSummary = ({ arxivId, paper }) => {
         </div>
       </div>
 
+      {/* Restricted-access notice — when summary is title-only because the
+          publisher (Elsevier 등) blocks automated abstract retrieval. */}
+      {summary.generation_model && summary.generation_model.includes('lab-title') && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-xl">ℹ️</span>
+            <div className="text-sm leading-relaxed text-amber-900 dark:text-amber-200">
+              <p className="font-semibold mb-1">출판사 저작권 보호로 abstract 제공이 제한된 논문입니다.</p>
+              <p>
+                이 논문은 Elsevier 등 출판사의 접근 제한 정책으로 인해 정식 abstract을 자동으로 가져올 수 없었습니다.
+                아래 요약은 제목·저자·게재지 정보로부터 추정한 내용이며,
+                <strong> 정확한 abstract과 실험 수치는 아래 "출판사 페이지에서 원문 보기" 링크를 통해 확인해주세요</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Content */}
       <div className="prose prose-lg max-w-none">
         <ReactMarkdown

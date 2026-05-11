@@ -5,13 +5,16 @@ import { API_BASE } from '../api/client'
 // Compact paper card tuned for the /hai list view.
 function HaiPaperCard({ paper }) {
   const isLab = paper.is_lab_publication
+  const abstractMissing = !paper.abstract || paper.abstract.length < 40
   const date = paper.published_date
     ? new Date(paper.published_date).toISOString().slice(0, 10)
     : (paper.year || '')
-  const detailHref = paper.arxiv_id?.startsWith('openalex:')
+  // Lab papers (hai:NNN, openalex:WID) link out to the publisher; arXiv papers
+  // open in our paper detail page.
+  const isExternal = paper.arxiv_id?.startsWith('openalex:') || paper.arxiv_id?.startsWith('hai:')
+  const detailHref = isExternal
     ? (paper.html_url || '#')
     : `/paper/${paper.arxiv_id}`
-  const isExternal = paper.arxiv_id?.startsWith('openalex:')
 
   const venue = paper.venue
   const authorPreview = (paper.authors || []).slice(0, 4).join(', ')
@@ -58,9 +61,13 @@ function HaiPaperCard({ paper }) {
         </p>
       )}
 
-      {paper.abstract && (
+      {paper.abstract ? (
         <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
           {paper.abstract}
+        </p>
+      ) : isLab && (
+        <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1.5 mt-2 leading-relaxed">
+          ℹ️ 출판사 저작권으로 abstract 표시 제한 — 원문은 위 링크 클릭
         </p>
       )}
     </article>
