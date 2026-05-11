@@ -134,10 +134,10 @@ export default function HaiPapers() {
             🎓 HAI Lab Picks
           </h1>
           <p className="text-base text-gray-600 dark:text-gray-300 max-w-3xl leading-relaxed">
-            <strong>Manufacturing AI · Physics-Informed ML · Fault Diagnosis · Digital Twin · Reliability.</strong>
+            HAI Lab은 <strong>Manufacturing AI</strong>, <strong>Physics-Informed ML</strong>, <strong>Fault Diagnosis</strong>, <strong>Digital Twin</strong>, <strong>Reliability</strong>를 중심으로 자율 지능 시스템을 연구합니다.
             <br />
-            HAI Lab의 <span className="text-purple-600 dark:text-purple-400 font-medium">자체 발표 논문</span>과
-            arXiv에서 매칭되는 <span className="text-indigo-600 dark:text-indigo-400 font-medium">관련 분야 신규 논문</span>을 한 곳에서 봅니다.
+            HAI Lab <span className="text-purple-600 dark:text-purple-400 font-medium">자체 발표 논문</span>과
+            arXiv 신규 논문 중 <span className="text-indigo-600 dark:text-indigo-400 font-medium">관련 분야</span>를 한 곳에서 봅니다.
           </p>
         </div>
       </section>
