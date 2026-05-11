@@ -210,7 +210,7 @@ export default function Home() {
               About SNU HAI Lab
             </h2>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-              HAI Lab은 <strong>Manufacturing AI</strong>, <strong>Physics-Informed ML</strong>, <strong>Fault Diagnosis</strong>, <strong>Digital Twin</strong>, <strong>Reliability</strong>를 중심으로 자율 지능 시스템을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
+              HAI Lab은 <strong>Manufacturing AI</strong>, <strong>Physics-Informed ML</strong>, <strong>Fault Diagnosis</strong>, <strong>Digital Twin</strong>, <strong>Foundation Models</strong>를 중심으로 자율 지능 시스템을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed pt-1">
               Built and maintained by{' '}
@@ -260,7 +260,7 @@ export default function Home() {
         <FeaturedSection
           endpoint="/hai/papers"
           title="🎓 HAI Lab Picks"
-          subtitle="Manufacturing AI · Physics-Informed ML · Fault Diagnosis · Digital Twin · Reliability — HAI Lab 자체 발표 및 관련 분야 논문"
+          subtitle="Manufacturing AI · Physics-Informed ML · Fault Diagnosis · Digital Twin · Foundation Models — HAI Lab 자체 발표 및 관련 분야 논문"
           accent="indigo"
           count={6}
           badge="HAI"
