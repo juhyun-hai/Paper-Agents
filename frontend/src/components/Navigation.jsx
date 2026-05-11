@@ -6,28 +6,14 @@ const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navItems = [
-    {
-      path: '/',
-      label: 'Home',
-      icon: '🏠',
-      description: 'Hot Paper homepage'
-    },
-    {
-      path: '/search',
-      label: 'Search',
-      icon: '🔍',
-      description: 'Search and browse papers'
-    },
-    {
-      path: '/trending',
-      label: 'Trending',
-      icon: '🔥',
-      description: 'Discover hottest papers'
-    }
+    { path: '/',         label: 'Home',     icon: '🏠', description: 'Hot Paper homepage' },
+    { path: '/search',   label: 'Search',   icon: '🔍', description: 'Search and browse papers' },
+    { path: '/trending', label: 'Trending', icon: '🔥', description: 'Discover hottest papers' },
+    { path: '/hai',      label: 'HAI Picks', icon: '🎓', description: 'HAI Lab featured papers' },
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <nav className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
@@ -38,10 +24,10 @@ const Navigation = () => {
                 <span className="text-white font-bold text-sm">🔥</span>
               </div>
               <div>
-                <div className="text-lg font-bold text-gray-900">
+                <div className="text-lg font-bold text-gray-900 dark:text-white">
                   Hot Paper
                 </div>
-                <div className="text-xs text-gray-500 -mt-1">
+                <div className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
                   AI Research Trend Discovery
                 </div>
               </div>
@@ -50,7 +36,7 @@ const Navigation = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-6">
               {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
@@ -59,8 +45,8 @@ const Navigation = () => {
                     to={item.path}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                     }`}
                   >
                     <span className="mr-2">{item.icon}</span>
@@ -71,11 +57,31 @@ const Navigation = () => {
             </div>
           </div>
 
-          {/* Status Indicator */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium text-green-700">System Ready</span>
+          {/* Lab + developer credit */}
+          <div className="hidden md:flex items-center text-xs text-gray-600 dark:text-gray-400 leading-tight text-right">
+            <div>
+              <div>
+                Curated by{' '}
+                <a
+                  href="https://hai.snu.ac.kr/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400"
+                >
+                  SNU HAI Lab
+                </a>
+              </div>
+              <div>
+                by{' '}
+                <a
+                  href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+                >
+                  Juhyun Kim
+                </a>
+              </div>
             </div>
           </div>
 
@@ -127,11 +133,29 @@ const Navigation = () => {
                 );
               })}
 
-              {/* Mobile Status */}
-              <div className="px-3 py-2 mt-4 border-t border-gray-300">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-medium text-green-700">System Ready</span>
+              {/* Lab + developer credit (mobile) */}
+              <div className="px-3 py-3 mt-2 border-t border-gray-300 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                <div>
+                  Curated by{' '}
+                  <a
+                    href="https://hai.snu.ac.kr/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-gray-900 dark:text-white"
+                  >
+                    SNU HAI Lab
+                  </a>
+                </div>
+                <div>
+                  by{' '}
+                  <a
+                    href="https://hai.snu.ac.kr/bbs/board.php?bo_table=sub2_2&wr_id=43&sca=2Ph.D.+student&page=2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Juhyun Kim
+                  </a>
                 </div>
               </div>
             </div>

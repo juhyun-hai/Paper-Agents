@@ -347,13 +347,26 @@ async def get_unsummarized_papers(
 async def extract_paper_figures(
     arxiv_id: str,
     max_figures: int = 5,
+    session: AsyncSession = Depends(get_async_session),
 ):
-    """Download the arXiv PDF and return up to N figures (base64 PNG + caption).
+    """Extract figures from arXiv papers ONLY.
 
-    This endpoint is intended for the daily summary trigger so it can attach
-    figures to each generated summary.
+    arXiv preprints are distributed under non-exclusive licenses that permit
+    figure reuse for purposes like ours. Journal/publisher papers (lab
+    publications stored as `hai:NNN` or `openalex:WID`) are copyrighted by
+    the publisher — we never re-host their figures. For those we return an
+    empty list and let the frontend show a "see publisher page" link.
     """
     try:
+        # Allow only canonical arXiv IDs (e.g. 2604.01234) — block everything else.
+        if not (arxiv_id[:1].isdigit() and "." in arxiv_id):
+            return {
+                "arxiv_id": arxiv_id,
+                "figure_count": 0,
+                "figures": [],
+                "skipped": "non-arxiv source (publisher figures not redistributed)",
+            }
+
         from ..services.figure_extractor import extract_figures
         figures = extract_figures(arxiv_id, max_figures=max_figures)
         return {
