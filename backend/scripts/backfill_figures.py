@@ -29,10 +29,14 @@ DB_URL = 'postgresql://research_agent:research_pass_2024@localhost:5432/research
 async def fetch_targets(conn, days: int, limit: int, mode: str):
     """Pick paper rows to backfill."""
     if mode == 'all':
+        # Restrict to canonical arXiv IDs — lab (hai:/openalex:) papers are
+        # handled by a separate script that uses pdf_url.
         rows = await conn.fetch("""
             SELECT ps.arxiv_id
             FROM paper_summaries ps
             WHERE COALESCE(ps.figure_count, 0) = 0
+              AND ps.arxiv_id NOT LIKE 'hai:%'
+              AND ps.arxiv_id NOT LIKE 'openalex:%'
             ORDER BY ps.id DESC
             LIMIT $1
         """, limit)
