@@ -390,12 +390,56 @@ async def main():
 
     all_trending = hf_papers + rss_papers + crossref_papers
 
+    # Trending feeds (HF/RSS/Crossref) don't include authors. Fetch authors
+    # from the arXiv API in one batched call so newly-saved papers have them.
+    arxiv_ids_for_authors = [
+        p['arxiv_id'] for p in all_trending
+        if p.get('title') and p.get('abstract')
+        and re.match(r'^[0-9]{4}\.[0-9]{4,5}$', p.get('arxiv_id') or '')
+    ]
+    authors_lookup = {}
+    if arxiv_ids_for_authors:
+        try:
+            import xml.etree.ElementTree as ET
+            ns = {'a': 'http://www.w3.org/2005/Atom'}
+            for i in range(0, len(arxiv_ids_for_authors), 100):
+                chunk = arxiv_ids_for_authors[i:i + 100]
+                url = (
+                    f"{ARXIV_API}?id_list={','.join(chunk)}"
+                    f"&max_results={len(chunk)}"
+                )
+                resp = requests.get(url, timeout=30, headers=HEADERS)
+                if resp.status_code != 200:
+                    continue
+                root = ET.fromstring(resp.text)
+                for entry in root.findall('a:entry', ns):
+                    id_el = entry.find('a:id', ns)
+                    if id_el is None:
+                        continue
+                    m = re.search(r'/abs/([0-9]{4}\.[0-9]{4,5})', id_el.text or '')
+                    if not m:
+                        continue
+                    aid = m.group(1)
+                    names = [
+                        a.find('a:name', ns).text.strip()
+                        for a in entry.findall('a:author', ns)
+                        if a.find('a:name', ns) is not None
+                    ]
+                    if names:
+                        authors_lookup[aid] = names
+                import time as _t
+                _t.sleep(3.5)
+        except Exception as e:
+            print(f'⚠️ arXiv author lookup failed: {e}')
+
     # trending 논문 중 DB에 없는 것 저장
     for p in all_trending:
         if p.get('title') and p.get('abstract'):
             await save_papers(conn, [{
                 'arxiv_id': p['arxiv_id'], 'title': p['title'],
-                'abstract': p['abstract'], 'authors': [], 'categories': [],
+                'abstract': p['abstract'],
+                'authors': authors_lookup.get(p['arxiv_id'], []),
+                'categories': [],
                 'published_date': datetime.now().strftime('%Y-%m-%d'),
                 'pdf_url': f'https://arxiv.org/pdf/{p["arxiv_id"]}.pdf',
                 'arxiv_url': f'https://arxiv.org/abs/{p["arxiv_id"]}',
