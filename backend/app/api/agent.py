@@ -108,13 +108,35 @@ _LAB_KEYWORDS = (
 )
 _RECENT_KEYWORDS = ('요즘', '최근', '최신', '이번', '근래', 'recent', 'latest')
 
+# Industrial / HAI 도메인 키워드 — '산업용 Foundation Model' 같은 질문에서
+# 일반 ML 논문 대신 산업 AI / PHM / 제조 / fault 관련 논문으로 좁힐 때 사용
+_INDUSTRIAL_KEYWORDS = (
+    '산업', 'industrial', 'manufacturing', '제조',
+    'phm', 'fault', '결함', '고장', '진단', 'diagnosis',
+    'rul', 'prognostic', '잔여수명', 'health management',
+    'physics-informed', 'physics informed', 'pinn', '물리 정보', '물리정보',
+    'digital twin', '디지털 트윈',
+    'signal processing', '신호 처리', '진동', 'vibration',
+    'reliability', '신뢰성', 'shm', 'condition monitoring',
+    '베어링', 'bearing', '기어박스', 'gearbox', 'motor', '모터',
+    'battery', '배터리', 'semiconductor', '반도체',
+    'foundation model' if False else '',  # 일반 FM 매칭은 너무 광범위해서 제외
+)
+
 
 def detect_intent(question: str) -> dict:
     """Lightweight keyword-based intent extraction."""
     q = question.lower()
+    industrial_hit = any(kw and kw in q for kw in _INDUSTRIAL_KEYWORDS)
+    # 'industrial foundation model', '산업용 ...', '제조 AI' 같은 표현 보강
+    if 'foundation model' in q and (
+        '산업' in q or 'industrial' in q or '제조' in q or 'manufacturing' in q
+    ):
+        industrial_hit = True
     return {
         'lab_only': any(kw in q for kw in _LAB_KEYWORDS),
         'recent': any(kw in question for kw in _RECENT_KEYWORDS),
+        'industrial': industrial_hit,
     }
 
 
@@ -158,6 +180,10 @@ async def ask(
 
     if intent['lab_only']:
         stmt = stmt.where(Paper.is_lab_publication.is_(True))
+    elif intent['industrial']:
+        # lab_only가 아닌 industrial 키워드만 있는 경우 (예: '산업용 FM', 'PHM 트렌드')
+        # → HAI 키워드 매칭 풀(is_hai=True, ~441편)로 좁혀서 일반 ML 논문 노이즈 제거
+        stmt = stmt.where(Paper.is_hai.is_(True))
     if intent['recent']:
         # 최근 = 작년 + 올해 (HAI Lab은 연 단위 출판 패턴이라 year 기준이 더 신뢰)
         from datetime import date as _date
@@ -177,11 +203,13 @@ async def ask(
     rows = await session.execute(stmt.limit(k))
     papers = rows.all()
 
-    # Fallback: lab+recent 조건이 너무 엄격해 결과 0인 경우 lab 조건만 남기고 재시도
-    if not papers and (intent['lab_only'] or intent['recent']):
+    # Fallback: 조건이 너무 엄격해 결과 0인 경우 lab/industrial 조건만 남기고 재시도
+    if not papers and (intent['lab_only'] or intent['recent'] or intent['industrial']):
         relax = select(Paper, sim_expr).where(Paper.full_embedding.is_not(None))
         if intent['lab_only']:
             relax = relax.where(Paper.is_lab_publication.is_(True))
+        elif intent['industrial']:
+            relax = relax.where(Paper.is_hai.is_(True))
         rows = await session.execute(
             relax.order_by(Paper.year.desc().nullslast(), sim_expr.desc()).limit(k)
         )
@@ -207,6 +235,8 @@ async def ask(
         intent_note = "참고: 사용자는 SNU HAI Lab이 최근 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
     elif intent['lab_only']:
         intent_note = "참고: 사용자는 SNU HAI Lab이 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
+    elif intent['industrial']:
+        intent_note = "참고: 사용자는 산업 AI/제조/PHM 같은 도메인 질문을 하고 있습니다. 아래 발췌는 모두 HAI Lab 관심 분야 키워드와 매칭된 논문(랩 발표 + 산업 AI 관련 arXiv)입니다. 일반 ML 트렌드가 아니라 **산업·제조 응용** 관점에서 답변하세요.\n\n"
     elif intent['recent']:
         intent_note = "참고: 사용자는 최근 동향을 묻고 있습니다. 아래 발췌는 최신 논문 순으로 정렬돼 있습니다.\n\n"
 
