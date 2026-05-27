@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const Navigation = () => {
+const Navigation = ({ onOpenAgent }) => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -10,7 +10,8 @@ const Navigation = () => {
     { path: '/search',   label: 'Search',   icon: '🔍', description: 'Search and browse papers' },
     { path: '/trending', label: 'Trending', icon: '🔥', description: 'Discover hottest papers' },
     { path: '/hai',      label: 'HAI Picks', icon: '🎓', description: 'HAI Lab featured papers' },
-    { path: '/ask',      label: 'Ask Agent', icon: '🤖', description: 'AI research assistant (beta)' },
+    // Paper Agent는 라우트 이동이 아니라 글로벌 모달이라 별도 처리
+    { kind: 'action',    action: 'openAgent', label: 'Paper Agent', icon: '🤖', description: 'AI research assistant (beta)' },
   ];
 
   return (
@@ -39,6 +40,18 @@ const Navigation = () => {
           <div className="hidden md:block">
             <div className="flex items-center space-x-6">
               {navItems.map((item) => {
+                if (item.kind === 'action') {
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => onOpenAgent && onOpenAgent()}
+                      className="px-3 py-2 rounded-lg text-sm font-medium transition-colors text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+                    >
+                      <span className="mr-2">{item.icon}</span>
+                      {item.label}
+                    </button>
+                  );
+                }
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
@@ -111,6 +124,23 @@ const Navigation = () => {
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 border-t border-gray-200 bg-gray-50">
               {navItems.map((item) => {
+                if (item.kind === 'action') {
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => { setIsMenuOpen(false); onOpenAgent && onOpenAgent(); }}
+                      className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                    >
+                      <div className="flex items-center">
+                        <span className="mr-3">{item.icon}</span>
+                        <div>
+                          <div>{item.label}</div>
+                          <div className="text-xs text-gray-500">{item.description}</div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                }
                 const isActive = location.pathname === item.path;
                 return (
                   <Link

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import TrendingPapers from './components/TrendingPapers';
 import Navigation from './components/Navigation';
+import PaperAgentModal from './components/PaperAgentModal';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Paper from './pages/Paper';
@@ -10,10 +11,11 @@ import Ask from './pages/Ask';
 import './App.css';
 
 function App() {
+  const [agentOpen, setAgentOpen] = useState(false);
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <Navigation />
+        <Navigation onOpenAgent={() => setAgentOpen(true)} />
 
         <main>
           <Routes>
@@ -71,6 +73,19 @@ function App() {
             </div>
           </div>
         </footer>
+
+        {/* Floating Paper Agent button — accessible from every page */}
+        <button
+          onClick={() => setAgentOpen(true)}
+          aria-label="Paper Agent 열기"
+          title="Paper Agent (Beta)"
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
+        >
+          <span className="text-xl leading-none">🤖</span>
+          <span className="hidden sm:inline font-medium text-sm">Paper Agent</span>
+        </button>
+
+        <PaperAgentModal isOpen={agentOpen} onClose={() => setAgentOpen(false)} />
       </div>
     </Router>
   );
