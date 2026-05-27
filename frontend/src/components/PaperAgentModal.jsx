@@ -411,18 +411,37 @@ function processChildren(children, sources) {
   return out
 }
 
+// Extract the first meaningful word(s) from a paper title for inline citation:
+//  - "ARDiff: An Adaptive ..." → "ARDiff"
+//  - "Multi-scale Signal Transformer ..." → "Multi-scale"
+//  - "A Deep Transferable Motion-Adaptive Fault ..." → "Deep Transferable" (skips leading "A")
+function shortLabel(title) {
+  if (!title) return ''
+  // Split on colon/dash first if present (often the model name is before ":")
+  const head = title.split(/[:—\-–]/)[0].trim()
+  const tokens = head.split(/\s+/)
+  // Skip leading stop-word articles
+  const STOP = new Set(['a', 'an', 'the', 'on', 'in', 'for', 'of', 'and', 'with'])
+  let i = 0
+  while (i < tokens.length && STOP.has(tokens[i].toLowerCase())) i++
+  let label = (tokens.slice(i, i + 2).join(' ') || tokens.join(' ')).slice(0, 24)
+  return label
+}
+
 function CiteChip({ index, src }) {
   if (!src) {
     return <span className="inline-flex items-center text-[10px] font-mono align-baseline mx-0.5 px-1.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">{index}</span>
   }
   const isArxiv = src.is_arxiv
+  const label = shortLabel(src.title)
   const inner = (
-    <span className={`inline-flex items-center text-[10px] font-mono font-semibold align-baseline mx-0.5 px-1.5 rounded ${
+    <span className={`inline-flex items-center gap-1 text-[11px] font-medium align-baseline mx-0.5 px-1.5 py-px rounded ${
       isArxiv
         ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-800/60'
         : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200'
-    }`} title={src.title || ''}>
-      {index}
+    }`} title={`${src.arxiv_id} — ${src.title || ''}`}>
+      <span className="font-mono font-bold">{index}</span>
+      {label && <span className="opacity-90 truncate max-w-[140px]">{label}</span>}
     </span>
   )
   if (isArxiv) {
@@ -445,29 +464,43 @@ function Bubble({ message, onSelect }) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3">
-        {/* Source citations */}
+        {/* Source citations — numbered to match inline [N] chips */}
         {message.sources && message.sources.length > 0 && (
           <div className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
             <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 font-semibold">
-              📚 검색된 논문 {message.sources.length}편
+              📚 검색된 논문 {message.sources.length}편 (본문 [N] 칩과 매칭)
             </p>
             <div className="space-y-1">
-              {message.sources.map((s) => (
-                s.is_arxiv ? (
-                  <Link key={s.arxiv_id} to={`/paper/${s.arxiv_id}`} onClick={onSelect}
-                    className="block text-[11px] hover:underline truncate">
-                    <span className="font-mono text-indigo-600 dark:text-indigo-300">[{s.arxiv_id}]</span>
-                    <span className="text-gray-700 dark:text-gray-300 ml-1">{s.title}</span>
-                    <span className="ml-1.5 text-[10px] text-gray-400">{Math.round((s.similarity || 0) * 100)}%</span>
-                  </Link>
-                ) : (
-                  <div key={s.arxiv_id} className="text-[11px] truncate">
-                    <span className="font-mono text-purple-600 dark:text-purple-300">[{s.arxiv_id}]</span>
-                    <span className="text-gray-700 dark:text-gray-300 ml-1">{s.title}</span>
-                    <span className="ml-1.5 text-[10px] text-gray-400">{Math.round((s.similarity || 0) * 100)}%</span>
+              {message.sources.map((s, i) => {
+                const num = i + 1
+                const numBadge = (
+                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-bold mr-2 shrink-0 ${
+                    s.is_arxiv
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
+                      : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200'
+                  }`}>{num}</span>
+                )
+                const content = (
+                  <div className="flex items-start text-[11px] leading-tight">
+                    {numBadge}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-gray-800 dark:text-gray-200 truncate">{s.title}</div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        <span className="font-mono">{s.arxiv_id}</span>
+                        <span className="ml-2">유사도 {Math.round((s.similarity || 0) * 100)}%</span>
+                      </div>
+                    </div>
                   </div>
                 )
-              ))}
+                return s.is_arxiv ? (
+                  <Link key={s.arxiv_id} to={`/paper/${s.arxiv_id}`} onClick={onSelect}
+                    className="block py-1 px-1 rounded hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10">
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={s.arxiv_id} className="py-1 px-1">{content}</div>
+                )
+              })}
             </div>
           </div>
         )}
