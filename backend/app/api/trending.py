@@ -541,3 +541,71 @@ async def get_hai_topics(session: AsyncSession = Depends(get_async_session)):
         })
     topics.sort(key=lambda x: -x["total"])
     return {"topics": topics}
+
+
+@hai_router.get("/related")
+async def get_hai_related(
+    lab_id: str = Query(..., description="Lab paper arxiv_id (e.g. 'hai:slug' or 'openalex:xxx')"),
+    limit: int = Query(5, ge=1, le=20),
+    days: int = Query(30, ge=1, le=365),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Return arXiv papers most similar to a given HAI Lab paper.
+
+    Uses pgvector cosine similarity on the lab paper's full_embedding.
+    Results are restricted to canonical arXiv IDs and papers published
+    within the last `days` days.
+    """
+    import numpy as np
+
+    res = await session.execute(
+        select(Paper).where(Paper.arxiv_id == lab_id)
+    )
+    lab = res.scalar_one_or_none()
+    if not lab:
+        return {"lab_paper": None, "papers": [], "reason": "not found"}
+    if lab.full_embedding is None:
+        return {
+            "lab_paper": {"arxiv_id": lab.arxiv_id, "title": lab.title},
+            "papers": [],
+            "reason": "no embedding yet",
+        }
+
+    query_vec = np.array(lab.full_embedding).tolist()
+    cutoff = (datetime.now() - timedelta(days=days)).date()
+
+    # Note: ORDER BY cosine_distance(vec) alongside a WHERE filter can return
+    # empty rows in some pgvector + planner combos. Computing the similarity as
+    # an aliased column and ordering by that alias works reliably.
+    sim_expr = (1 - Paper.full_embedding.cosine_distance(query_vec)).label("sim")
+    sim_q = await session.execute(
+        select(Paper, sim_expr)
+        .where(
+            Paper.full_embedding.is_not(None),
+            Paper.arxiv_id.op("~")(r"^[0-9]{4}\.[0-9]{4,5}$"),
+            Paper.published_date >= cutoff,
+        )
+        .order_by(sim_expr.desc())
+        .limit(limit)
+    )
+
+    papers = []
+    for p, s in sim_q.all():
+        papers.append({
+            "arxiv_id": p.arxiv_id,
+            "title": p.title,
+            "authors": (p.authors or [])[:5],
+            "abstract": (p.abstract or "")[:400],
+            "categories": p.categories or [],
+            "published_date": p.published_date.isoformat() if p.published_date else "",
+            "pdf_url": p.pdf_url,
+            "html_url": p.html_url,
+            "similarity": round(float(s), 4),
+        })
+
+    return {
+        "lab_paper": {"arxiv_id": lab.arxiv_id, "title": lab.title},
+        "papers": papers,
+        "total": len(papers),
+        "lookback_days": days,
+    }

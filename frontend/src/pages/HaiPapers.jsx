@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE } from '../api/client'
 
 // Compact paper card tuned for the /hai list view.
 function HaiPaperCard({ paper }) {
   const isLab = paper.is_lab_publication
-  const abstractMissing = !paper.abstract || paper.abstract.length < 40
   const date = paper.published_date
     ? new Date(paper.published_date).toISOString().slice(0, 10)
     : (paper.year || '')
@@ -20,8 +19,33 @@ function HaiPaperCard({ paper }) {
   const authorPreview = (paper.authors || []).slice(0, 4).join(', ')
   const moreAuthors = Math.max(0, (paper.authors || []).length - 4)
 
-  const card = (
-    <article className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 hover:border-indigo-400 hover:shadow-md transition-all">
+  // Related-paper state — only used for lab papers
+  const [expanded, setExpanded] = useState(false)
+  const [related, setRelated] = useState(null) // null=not loaded
+  const [loadingRel, setLoadingRel] = useState(false)
+  const [relReason, setRelReason] = useState(null)
+
+  async function toggleRelated() {
+    if (!expanded && related === null) {
+      setLoadingRel(true)
+      try {
+        const url = `${API_BASE}/hai/related?lab_id=${encodeURIComponent(paper.arxiv_id)}&limit=5&days=30`
+        const r = await fetch(url)
+        const d = await r.json()
+        setRelated(d.papers || [])
+        setRelReason(d.reason || null)
+      } catch {
+        setRelated([])
+        setRelReason('error')
+      } finally {
+        setLoadingRel(false)
+      }
+    }
+    setExpanded(!expanded)
+  }
+
+  const headerAndBody = (
+    <>
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex flex-wrap items-center gap-2">
           {isLab && (
@@ -66,12 +90,66 @@ function HaiPaperCard({ paper }) {
           {paper.abstract}
         </p>
       )}
-    </article>
+    </>
   )
 
-  return isExternal
-    ? <a href={detailHref} target="_blank" rel="noopener noreferrer" className="block">{card}</a>
-    : <Link to={detailHref} className="block">{card}</Link>
+  const titleLink = isExternal
+    ? <a href={detailHref} target="_blank" rel="noopener noreferrer" className="block">{headerAndBody}</a>
+    : <Link to={detailHref} className="block">{headerAndBody}</Link>
+
+  return (
+    <article className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 hover:border-indigo-400 hover:shadow-md transition-all">
+      {titleLink}
+
+      {isLab && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+          <button
+            onClick={toggleRelated}
+            className="w-full flex items-center justify-between text-xs font-medium text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 dark:hover:text-indigo-200"
+          >
+            <span>🔗 관련 최신 arXiv 논문 (30일 이내)</span>
+            <span>{expanded ? '▲' : '▼'}</span>
+          </button>
+
+          {expanded && (
+            <div className="mt-3 space-y-2">
+              {loadingRel && (
+                <div className="text-xs text-gray-500 dark:text-gray-400">로딩 중…</div>
+              )}
+              {!loadingRel && related && related.length === 0 && (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {relReason === 'no embedding yet'
+                    ? '이 논문의 임베딩이 아직 생성되지 않았습니다.'
+                    : '최근 30일 이내 유사한 논문을 찾지 못했습니다.'}
+                </div>
+              )}
+              {!loadingRel && related && related.length > 0 && related.map((r) => (
+                <Link
+                  key={r.arxiv_id}
+                  to={`/paper/${r.arxiv_id}`}
+                  className="block px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-indigo-400 hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2">
+                      {r.title}
+                    </div>
+                    <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                      {Math.round((r.similarity || 0) * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    {(r.authors || []).slice(0, 2).join(', ')}
+                    {r.authors && r.authors.length > 2 && ` +${r.authors.length - 2}`}
+                    {r.published_date && <span className="ml-2">{r.published_date.slice(0, 10)}</span>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  )
 }
 
 export default function HaiPapers() {

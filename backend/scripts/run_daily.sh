@@ -11,3 +11,7 @@ export HF_HOME=/home/juhyun/agent/paper-agent-github/backend/hf_cache
 # 2. Backfill any missing figures (new papers + leftovers from previous days)
 #    Caps at 50 per run so we never block the cron for too long.
 /usr/bin/python3 -u scripts/backfill_figures.py --all --limit 50 || true
+
+# 3. Generate embeddings for any papers missing them so new featured 25 enter
+#    the /api/hai/related recommendation pool the same morning.
+/usr/bin/python3 -u scripts/generate_embeddings.py || true
