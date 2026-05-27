@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_async_session
-from ..models import Paper
+from ..models import Paper, PaperSummary
 from ..services.embedding_service import get_embedding_service
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
@@ -57,13 +57,14 @@ SYSTEM_PROMPT = """당신은 HotPaper.ai의 Paper Agent입니다. SNU HAI Lab의
 - 한국어로 답변.
 
 답변 형식 (반드시 마크다운):
-1. 첫 줄: `**핵심 요약:**` 한 문장 (최대 70자, 한국어).
-2. 그 다음 빈 줄, 본문은 짧은 불릿 4~6개로만 작성.
+1. 첫 줄: `**핵심 요약:**` 한 문장 (한국어, 80자 내외).
+2. 빈 줄 후, 본문은 불릿 5~8개.
 3. 각 불릿:
-   - **굵은 핵심어**로 시작 → 이어서 짧은 설명 (한 줄, 100자 이내).
-   - 인용은 불릿 끝에 [1], [2] 형태로.
-4. 산문 단락 금지. 헤더(###) 금지. **핵심 요약 + 불릿만**.
-5. 마지막에 절대 "참고 논문" 같은 섹션을 만들지 마세요 (UI에 이미 있음).
+   - **굵은 핵심어/방법명**으로 시작 → 그 다음에 구체적인 설명 (방법론·핵심 아이디어·결과·한계 중 1~2개를 포함, 1~2 줄).
+   - Context에 한국어 요약이 있으면 그 안의 **구체적인 모듈명/데이터셋/수치/장단점**을 가능한 한 인용. 추상적 일반론(예: "신뢰성을 높인다")만 쓰지 말 것.
+   - 인용은 불릿 끝에 [1], [2] 형태.
+4. 헤더(##/###) 금지, 산문 단락 금지. 핵심 요약 박스 + 불릿 리스트만.
+5. "참고 논문" 같은 섹션 만들지 말 것 (UI에 이미 있음).
 
 수식·표기 규칙:
 - **LaTeX 절대 금지** ($...$, \\frac, \\sigma 같은 표기 금지). 사이트는 LaTeX를 렌더링하지 않음.
@@ -79,16 +80,24 @@ SYSTEM_PROMPT = """당신은 HotPaper.ai의 Paper Agent입니다. SNU HAI Lab의
 - **Unseen fault 식별** — Center margin loss로 학습되지 않은 클래스 거부 [4]"""
 
 
-def _format_context(papers: list[tuple[Paper, float]]) -> str:
+def _format_context(papers: list[tuple[Paper, float]], ko_map: dict[str, str]) -> str:
+    """검색된 논문 발췌를 LLM에게 보낼 형태로 정리.
+
+    영문 abstract뿐 아니라 paper_summaries의 한국어 7섹션 요약(있으면)을
+    함께 보내 LLM이 깊이 있는 답변을 생성할 수 있도록 한다.
+    """
     lines = []
     for i, (p, sim) in enumerate(papers, 1):
         tag = "🎓 HAI Lab" if p.is_lab_publication else "arXiv"
         year = p.year or (p.published_date.year if p.published_date else "n/a")
-        lines.append(
-            f"[논문 {i}] {p.arxiv_id} | {tag} | {year} | 유사도 {sim:.2f}\n"
-            f"제목: {p.title}\n"
-            f"초록: {(p.abstract or '')[:600]}\n"
-        )
+        ko = (ko_map.get(p.arxiv_id) or "").strip()
+
+        header = f"[논문 {i}] {p.arxiv_id} | {tag} | {year}\n제목: {p.title}\n"
+        if ko:
+            # 7섹션 한국어 요약은 평균 1,200~1,500자라 1,600자에서 자른다
+            lines.append(header + f"한국어 요약:\n{ko[:1600]}\n")
+        else:
+            lines.append(header + f"초록(영문): {(p.abstract or '')[:700]}\n")
     return "\n".join(lines)
 
 
@@ -181,7 +190,18 @@ async def ask(
     if not papers:
         raise HTTPException(503, "검색 결과가 없습니다")
 
-    # 3) Intent를 LLM에 알려서 답변 톤 조정
+    # 3) 한국어 요약 일괄 조회 (각 논문당 7섹션 ~1,500자)
+    arxiv_ids = [p.arxiv_id for p, _ in papers]
+    sum_rows = await session.execute(
+        select(PaperSummary.arxiv_id, PaperSummary.summary_text)
+        .where(PaperSummary.arxiv_id.in_(arxiv_ids))
+    )
+    ko_map: dict[str, str] = {}
+    for aid, txt in sum_rows.all():
+        if txt and (aid not in ko_map or len(txt) > len(ko_map[aid])):
+            ko_map[aid] = txt
+
+    # 4) Intent를 LLM에 알려서 답변 톤 조정
     intent_note = ""
     if intent['lab_only'] and intent['recent']:
         intent_note = "참고: 사용자는 SNU HAI Lab이 최근 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
@@ -192,8 +212,8 @@ async def ask(
 
     user_msg = (
         f"{intent_note}"
-        f"다음은 검색된 논문 발췌입니다.\n\n"
-        f"{_format_context(papers)}\n"
+        f"다음은 검색된 논문 발췌입니다. 각 논문에는 영문 초록 또는 한국어 7섹션 요약이 포함돼 있습니다.\n\n"
+        f"{_format_context(papers, ko_map)}\n"
         f"---\n사용자 질문: {question}\n\n"
         f"위 발췌만 근거로 한국어 마크다운으로 답변하세요. 인용은 [1], [2] 번호만 사용."
     )
@@ -231,9 +251,11 @@ async def ask(
                             {"role": "user", "content": user_msg},
                         ],
                         "options": {
-                            "num_predict": 800,
+                            # 깊이 있는 답변 허용 (불릿 5-8개 + 각 1-2줄)
+                            "num_predict": 1500,
                             "temperature": 0.3,
                             "top_p": 0.9,
+                            "num_ctx": 8192,  # 한국어 요약 8편 ≈ 12K chars ≈ ~3K tokens
                         },
                     },
                 ) as resp:
