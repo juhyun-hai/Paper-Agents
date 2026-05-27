@@ -166,11 +166,12 @@ async def ask(
         raise HTTPException(429, "잠시 후 다시 시도해주세요 (분당 3회, 일당 30회 제한)")
 
     k = max(1, min(int(payload.get("k") or TOP_K), 12))
+    topic = (payload.get("topic") or "").strip().lower() or None  # 사용자가 chip으로 선택한 토픽
 
     # 1) Intent 감지
     intent = detect_intent(question)
 
-    # 2) Retrieve — intent에 따라 검색 풀 분기
+    # 2) Retrieve — topic chip + intent에 따라 검색 풀 분기
     svc = get_embedding_service()
     q_emb = (await svc.encode_texts_async([question]))[0]
     q_vec = np.array(q_emb).tolist()
@@ -178,7 +179,15 @@ async def ask(
 
     stmt = select(Paper, sim_expr).where(Paper.full_embedding.is_not(None))
 
-    if intent['lab_only']:
+    # 명시적 topic chip이 가장 우선. 'lab'이면 lab_only 의도로 변환.
+    if topic == "lab":
+        stmt = stmt.where(Paper.is_lab_publication.is_(True))
+        intent['lab_only'] = True
+    elif topic:
+        # hai_topic = 'fault-diagnosis' 같은 값
+        stmt = stmt.where(Paper.hai_topic == topic, Paper.is_hai.is_(True))
+        intent['industrial'] = True
+    elif intent['lab_only']:
         stmt = stmt.where(Paper.is_lab_publication.is_(True))
     elif intent['industrial']:
         # lab_only가 아닌 industrial 키워드만 있는 경우 (예: '산업용 FM', 'PHM 트렌드')
@@ -190,11 +199,20 @@ async def ask(
         this_year = _date.today().year
         stmt = stmt.where(Paper.year >= this_year - 1)
 
-    # 정렬: 'recent' 의도면 최신순 우선, 아니면 유사도 우선
+    # 정렬:
+    #  - recent → 최신순 우선
+    #  - 명시 토픽 chip(fault-diagnosis 등) → lab 우선 (hai_topic 분류가
+    #    abstract 기반이라 lab 논문이 더 신뢰 가능)
+    #  - 기본 → 유사도
     if intent['recent']:
         stmt = stmt.order_by(
             Paper.year.desc().nullslast(),
             Paper.published_date.desc().nullslast(),
+            sim_expr.desc(),
+        )
+    elif topic and topic != "lab":
+        stmt = stmt.order_by(
+            Paper.is_lab_publication.desc(),
             sim_expr.desc(),
         )
     else:

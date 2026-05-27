@@ -3,11 +3,96 @@ import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { API_BASE } from '../api/client'
 
-const SUGGESTIONS = [
-  '최근 산업용 Foundation Model 트렌드 정리해줘',
-  'PHM에서 uncertainty-aware fault diagnosis 접근법은?',
-  'Physics-Informed ML로 baseline 깨는 핵심 아이디어가 뭐야?',
-  'Digital twin과 signal processing을 결합한 최근 연구는?',
+// 토픽 chip — 명시적 필터 + 토픽별 예시 질문 (DB 매칭이 잘 되는 것들로 검증)
+const TOPICS = [
+  {
+    key: '',  // 전체
+    label: '전체',
+    icon: '🌐',
+    examples: [
+      'HAI Lab의 최근 fault diagnosis 연구는?',
+      'Physics-Informed ML을 PHM에 어떻게 적용하나?',
+      'Bearing fault diagnosis에서 자주 쓰이는 신호 처리 기법은?',
+      'Domain adaptation으로 변동 운영 조건을 어떻게 다루나?',
+    ],
+  },
+  {
+    key: 'lab',
+    label: 'HAI Lab',
+    icon: '🎓',
+    examples: [
+      'HAI Lab은 요즘 어떤 논문이 나와?',
+      'HAI Lab의 fault diagnosis 연구 정리해줘',
+      'HAI Lab의 signal processing 연구는?',
+      'HAI Lab의 generative design 관련 연구는?',
+    ],
+  },
+  {
+    key: 'fault-diagnosis',
+    label: 'Fault Diagnosis',
+    icon: '⚙️',
+    examples: [
+      'Bearing fault diagnosis 최신 기법은?',
+      'Unseen fault 식별을 위한 접근법은?',
+      'Variable speed 환경에서 결함 진단 핵심 아이디어',
+      'Hybrid signal processing + deep learning fault diagnosis 사례',
+    ],
+  },
+  {
+    key: 'rul-phm',
+    label: 'PHM / RUL',
+    icon: '📈',
+    examples: [
+      'Remaining useful life 예측 최근 트렌드',
+      'Uncertainty-aware prognostics 핵심 아이디어',
+      'Few-shot RUL 예측 접근법은?',
+      'PHM 시스템에서 데이터 부족을 다루는 방법',
+    ],
+  },
+  {
+    key: 'signal-processing',
+    label: 'Signal Processing',
+    icon: '📡',
+    examples: [
+      '진동 신호 디노이징 최신 기법은?',
+      'Multi-scale signal analysis 접근법',
+      'Time-frequency representation을 ML과 결합하는 방법',
+      'Signal processing 기반 attention 메커니즘은?',
+    ],
+  },
+  {
+    key: 'physics-informed',
+    label: 'Physics-Informed ML',
+    icon: '🔬',
+    examples: [
+      'Physics-informed neural network 핵심 아이디어',
+      'PINN을 fault diagnosis에 적용한 사례',
+      'Physics-guided data augmentation 기법',
+      'Hybrid physics + data-driven 모델 트렌드',
+    ],
+  },
+  {
+    key: 'manufacturing',
+    label: 'Manufacturing',
+    icon: '🏭',
+    examples: [
+      'Manufacturing AI 최신 동향',
+      'Smart manufacturing에서 AI 적용 사례',
+      '제조 공정 최적화 ML 기법',
+      'Quality inspection AI 트렌드',
+    ],
+  },
+  {
+    key: 'digital-twin',
+    label: 'Digital Twin',
+    icon: '👯',
+    examples: [
+      'Digital twin과 ML 결합 연구',
+      'Digital twin 기반 예측 정비 접근법',
+      'Real-time digital twin 구현 핵심 기술',
+      'Physics-informed digital twin 사례',
+    ],
+  },
 ]
 
 export default function PaperAgentModal({ isOpen, onClose }) {
@@ -15,9 +100,12 @@ export default function PaperAgentModal({ isOpen, onClose }) {
   const [messages, setMessages] = useState([])
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState('')
+  const [topicKey, setTopicKey] = useState('')  // '' = 전체
   const inputRef = useRef(null)
   const endRef = useRef(null)
   const abortRef = useRef(null)
+
+  const activeTopic = TOPICS.find(t => t.key === topicKey) || TOPICS[0]
 
   useEffect(() => {
     if (isOpen) {
@@ -55,7 +143,7 @@ export default function PaperAgentModal({ isOpen, onClose }) {
       const resp = await fetch(`${API_BASE}/agent/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, topic: topicKey || undefined }),
         signal: controller.signal,
       })
       if (!resp.ok) {
@@ -144,15 +232,34 @@ export default function PaperAgentModal({ isOpen, onClose }) {
           </div>
         </div>
 
+        {/* Topic chip row (always visible) */}
+        <div className="px-5 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 font-semibold">
+            주제 필터
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {TOPICS.map(t => (
+              <button key={t.key || 'all'} onClick={() => setTopicKey(t.key)}
+                className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                  topicKey === t.key
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-indigo-400'
+                }`}>
+                <span className="mr-1">{t.icon}</span>{t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {messages.length === 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                예시 질문
+                {activeTopic.icon} {activeTopic.label} 예시 질문
               </p>
               <div className="grid grid-cols-1 gap-2">
-                {SUGGESTIONS.map((s) => (
+                {activeTopic.examples.map((s) => (
                   <button key={s} onClick={() => ask(s)} disabled={streaming}
                     className="text-left text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-400 hover:bg-indigo-50/40 dark:hover:bg-indigo-900/10 transition-colors disabled:opacity-50">
                     {s}
@@ -160,7 +267,7 @@ export default function PaperAgentModal({ isOpen, onClose }) {
                 ))}
               </div>
               <div className="text-[11px] text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-100 dark:border-gray-800">
-                💡 답변에 인용된 arXiv ID를 클릭하면 한국어 요약 + 핵심 그림이 있는 상세 페이지로 이동합니다.
+                💡 답변에 인용된 arXiv ID를 클릭하면 한국어 요약 + 핵심 그림이 있는 상세 페이지로 이동합니다. 주제 필터를 바꾸면 그 분야 논문만 검색합니다.
               </div>
             </div>
           )}
