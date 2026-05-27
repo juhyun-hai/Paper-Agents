@@ -28,14 +28,17 @@ export default function PaperCard({ paper, query = '', showSimilarity = false })
   const {
     arxiv_id,
     title = 'Untitled',
-    authors = [],
-    abstract = '',
-    categories = [],
-    date = '',
-    citation_count = 0,
     similarity_score,
     venue,
   } = paper
+
+  // Default destructure는 키가 `undefined`일 때만 적용되고 `null`이면 그대로 들어옴.
+  // API가 비어있는 필드를 null로 보내는 경우가 있어 명시적으로 || fallback.
+  const authors = paper.authors || []
+  const abstract = paper.abstract || ''
+  const categories = paper.categories || []
+  const date = paper.date || ''
+  const citation_count = paper.citation_count || 0
 
   const displayAuthors = authors.length > 3
     ? [...authors.slice(0, 3), 'et al.'].join(', ')

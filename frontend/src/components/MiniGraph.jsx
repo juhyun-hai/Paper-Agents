@@ -69,9 +69,17 @@ export default function MiniGraph({ data, focusId }) {
     return () => sim.stop()
   }, [data, focusId])
 
+  const isEmpty = !data || !((data.nodes || []).length)
+
   return (
     <div className="w-full overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-      <svg ref={svgRef} className="w-full" />
+      {isEmpty ? (
+        <div className="py-8 px-4 text-center text-sm text-gray-500 dark:text-gray-400">
+          관련 논문이 충분히 발견되지 않았습니다.
+        </div>
+      ) : (
+        <svg ref={svgRef} className="w-full" />
+      )}
     </div>
   )
 }

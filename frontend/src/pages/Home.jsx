@@ -210,7 +210,7 @@ export default function Home() {
               About SNU HAI Lab
             </h2>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-              HAI Lab은 <strong>Industrial Foundation Models</strong>, <strong>Industrial Physical AI</strong>를 중심으로, <strong>Manufacturing AI</strong>, <strong>Physics-Informed ML</strong>, <strong>Signal Processing</strong>, <strong>Digital Twin</strong>, <strong>Reliability</strong>까지 자율 지능 시스템을 연구합니다. HotPaper.ai는 매일 수백 편 중에서 진짜 임팩트 있는 25편만 골라 핵심 그림·결과 표와 함께 한국어로 요약합니다.
+              HAI Lab은 <strong>Industrial Foundation Models</strong>, <strong>Industrial Physical AI</strong>를 중심으로, <strong>Manufacturing AI</strong>, <strong>Physics-Informed ML</strong>, <strong>Signal Processing</strong>, <strong>Digital Twin</strong>, <strong>Reliability</strong>까지 자율 지능 시스템을 연구합니다. HotPaper.ai는 매일 후보 논문 풀에서 HF Daily 큐레이션·다중 소스 합의·연구실 관심도를 결합해 25편만 선정하고, 핵심 그림·결과 표와 함께 한국어로 요약합니다.
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed pt-1">
               Built and maintained by{' '}

@@ -123,7 +123,9 @@ export default function HotTopics() {
         <div className="flex items-center gap-2">
           <span className="text-xl">🔥</span>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Hot Topics</h2>
-          <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 px-2 py-0.5 rounded-full font-medium">Today</span>
+          <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 px-2 py-0.5 rounded-full font-medium">
+            {days === 1 ? 'Today' : `Last ${days}d`}
+          </span>
         </div>
         <div className="flex gap-1">
           {[1, 3, 7].map(d => (
