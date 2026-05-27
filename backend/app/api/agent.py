@@ -249,18 +249,24 @@ async def ask(
     if not papers:
         raise HTTPException(503, "검색 결과가 없습니다")
 
-    # 2-bis) 약한 매칭 필터링 — sim 0.45 미만은 LLM에 보내지 않는다.
-    # LLM이 약한 매칭을 '관련된 척' 합성하는 hallucination을 원천 차단.
-    # 단 모든 결과가 약하면 가장 강한 1~3편만 남기고 "weak_only" 플래그를 켠다.
+    # 2-bis) 약한 매칭 필터링 — 명시 필터(topic chip / lab_only / industrial)가
+    # 이미 검색 풀을 좁혀둔 경우엔 sim threshold를 적용하지 않는다 (이중 필터링
+    # 방지). 일반 query만 threshold로 hallucination 차단.
     STRONG_THRESHOLD = 0.45
-    strong = [(p, s) for p, s in papers if s >= STRONG_THRESHOLD]
+    has_explicit_filter = bool(topic) or intent['lab_only'] or intent['industrial']
     weak_only = False
-    if strong:
-        papers = strong
+
+    if has_explicit_filter:
+        # SQL 단계에서 이미 도메인 필터링됨 → sim 점수와 무관하게 그대로 사용
+        pass
     else:
-        # 전부 약한 매칭 — 상위 3편만 남기고 솔직한 답변 유도
-        papers = papers[:3]
-        weak_only = True
+        strong = [(p, s) for p, s in papers if s >= STRONG_THRESHOLD]
+        if strong:
+            papers = strong
+        else:
+            # 전부 약한 매칭 — 상위 3편만 남기고 솔직한 답변 유도
+            papers = papers[:3]
+            weak_only = True
 
     # 3) 한국어 요약 일괄 조회 (각 논문당 7섹션 ~1,500자)
     arxiv_ids = [p.arxiv_id for p, _ in papers]
