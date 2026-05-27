@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Paper from './pages/Paper';
 import HaiPapers from './pages/HaiPapers';
+import Ask from './pages/Ask';
 import './App.css';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/paper/:arxiv_id" element={<Paper />} />
             <Route path="/hai" element={<HaiPapers />} />
+            <Route path="/ask" element={<Ask />} />
           </Routes>
         </main>
 

@@ -24,6 +24,7 @@ from .api.trending import (
     hai_router,
 )
 from .api.summary import router as summary_router
+from .api.agent import router as agent_router
 
 
 @asynccontextmanager
@@ -186,6 +187,7 @@ app.include_router(hot_topics_router)
 app.include_router(summary_router)
 app.include_router(featured_router)
 app.include_router(hai_router)
+app.include_router(agent_router)
 
 
 # Root endpoints

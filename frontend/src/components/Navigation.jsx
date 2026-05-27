@@ -10,6 +10,7 @@ const Navigation = () => {
     { path: '/search',   label: 'Search',   icon: '🔍', description: 'Search and browse papers' },
     { path: '/trending', label: 'Trending', icon: '🔥', description: 'Discover hottest papers' },
     { path: '/hai',      label: 'HAI Picks', icon: '🎓', description: 'HAI Lab featured papers' },
+    { path: '/ask',      label: 'Ask Agent', icon: '🤖', description: 'AI research assistant (beta)' },
   ];
 
   return (
