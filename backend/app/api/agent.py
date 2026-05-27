@@ -82,12 +82,31 @@ SYSTEM_PROMPT = """당신은 HotPaper.ai의 Paper Agent입니다. SNU HAI Lab의
 def _format_context(papers: list[tuple[Paper, float]]) -> str:
     lines = []
     for i, (p, sim) in enumerate(papers, 1):
+        tag = "🎓 HAI Lab" if p.is_lab_publication else "arXiv"
+        year = p.year or (p.published_date.year if p.published_date else "n/a")
         lines.append(
-            f"[논문 {i}] arXiv:{p.arxiv_id} | 유사도 {sim:.2f}\n"
+            f"[논문 {i}] {p.arxiv_id} | {tag} | {year} | 유사도 {sim:.2f}\n"
             f"제목: {p.title}\n"
             f"초록: {(p.abstract or '')[:600]}\n"
         )
     return "\n".join(lines)
+
+
+_LAB_KEYWORDS = (
+    'hai lab', 'haı', 'hai-lab', 'hai랩', 'snu hai',
+    '연구실', '랩 논문', '랩이', '랩은', '랩에서', '랩의',
+    'lab 논문', 'lab이', 'lab은', 'lab에서',
+)
+_RECENT_KEYWORDS = ('요즘', '최근', '최신', '이번', '근래', 'recent', 'latest')
+
+
+def detect_intent(question: str) -> dict:
+    """Lightweight keyword-based intent extraction."""
+    q = question.lower()
+    return {
+        'lab_only': any(kw in q for kw in _LAB_KEYWORDS),
+        'recent': any(kw in question for kw in _RECENT_KEYWORDS),
+    }
 
 
 @router.post("/ask")
@@ -117,27 +136,66 @@ async def ask(
 
     k = max(1, min(int(payload.get("k") or TOP_K), 12))
 
-    # 1) Retrieve
+    # 1) Intent 감지
+    intent = detect_intent(question)
+
+    # 2) Retrieve — intent에 따라 검색 풀 분기
     svc = get_embedding_service()
     q_emb = (await svc.encode_texts_async([question]))[0]
     q_vec = np.array(q_emb).tolist()
-
     sim_expr = (1 - Paper.full_embedding.cosine_distance(q_vec)).label("sim")
-    rows = await session.execute(
-        select(Paper, sim_expr)
-        .where(Paper.full_embedding.is_not(None))
-        .order_by(sim_expr.desc())
-        .limit(k)
-    )
+
+    stmt = select(Paper, sim_expr).where(Paper.full_embedding.is_not(None))
+
+    if intent['lab_only']:
+        stmt = stmt.where(Paper.is_lab_publication.is_(True))
+    if intent['recent']:
+        # 최근 = 작년 + 올해 (HAI Lab은 연 단위 출판 패턴이라 year 기준이 더 신뢰)
+        from datetime import date as _date
+        this_year = _date.today().year
+        stmt = stmt.where(Paper.year >= this_year - 1)
+
+    # 정렬: 'recent' 의도면 최신순 우선, 아니면 유사도 우선
+    if intent['recent']:
+        stmt = stmt.order_by(
+            Paper.year.desc().nullslast(),
+            Paper.published_date.desc().nullslast(),
+            sim_expr.desc(),
+        )
+    else:
+        stmt = stmt.order_by(sim_expr.desc())
+
+    rows = await session.execute(stmt.limit(k))
     papers = rows.all()
+
+    # Fallback: lab+recent 조건이 너무 엄격해 결과 0인 경우 lab 조건만 남기고 재시도
+    if not papers and (intent['lab_only'] or intent['recent']):
+        relax = select(Paper, sim_expr).where(Paper.full_embedding.is_not(None))
+        if intent['lab_only']:
+            relax = relax.where(Paper.is_lab_publication.is_(True))
+        rows = await session.execute(
+            relax.order_by(Paper.year.desc().nullslast(), sim_expr.desc()).limit(k)
+        )
+        papers = rows.all()
+
     if not papers:
-        raise HTTPException(503, "검색 결과가 없습니다 (임베딩 풀 비어있음)")
+        raise HTTPException(503, "검색 결과가 없습니다")
+
+    # 3) Intent를 LLM에 알려서 답변 톤 조정
+    intent_note = ""
+    if intent['lab_only'] and intent['recent']:
+        intent_note = "참고: 사용자는 SNU HAI Lab이 최근 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
+    elif intent['lab_only']:
+        intent_note = "참고: 사용자는 SNU HAI Lab이 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
+    elif intent['recent']:
+        intent_note = "참고: 사용자는 최근 동향을 묻고 있습니다. 아래 발췌는 최신 논문 순으로 정렬돼 있습니다.\n\n"
 
     user_msg = (
-        f"다음은 사용자 질문과 의미적으로 가장 가까운 논문 발췌입니다.\n\n"
+        f"{intent_note}"
+        f"다음은 검색된 논문 발췌입니다.\n\n"
         f"{_format_context(papers)}\n"
         f"---\n사용자 질문: {question}\n\n"
-        f"위 발췌만 근거로 한국어로 답변하세요. 인용한 논문은 [arXiv ID] 형식으로 본문에 명시하세요."
+        f"위 발췌만 근거로 한국어 마크다운으로 답변하세요. 인용은 [1], [2] 번호만 사용."
     )
 
     async def event_stream() -> AsyncIterator[bytes]:
