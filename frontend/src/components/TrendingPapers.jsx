@@ -21,9 +21,11 @@ const TrendingPapers = () => {
 
     try {
       // Load all trending data in parallel
+      // Note: 매일 Top 25만 큐레이션해서 papers/요약 풀에 넣음. 화면도 25편으로
+      // 맞춤. Weekly는 7일 × 25 + 중복 제거라 ~50편 정도가 자연스럽다.
       const [todayRes, weekRes, statsRes, sourcesRes] = await Promise.all([
-        fetch(`${API_BASE}/trending/today?limit=100`),
-        fetch(`${API_BASE}/trending/week?limit=100`),
+        fetch(`${API_BASE}/trending/today?limit=25`),
+        fetch(`${API_BASE}/trending/week?limit=50`),
         fetch(`${API_BASE}/trending/stats`),
         fetch(`${API_BASE}/trending/sources`)
       ]);

@@ -258,25 +258,27 @@ async def get_trending_stats(session: AsyncSession = Depends(get_async_session))
         today = date.today()
         week_ago = today - timedelta(days=7)
 
-        # Today's count
+        # Today's curated count — trending_papers 테이블에는 100편이 저장되지만
+        # 화면에는 Top 25 featured만 노출하므로 그 기준으로 카운트.
         today_result = await session.execute(
             select(func.count(TrendingPaper.id))
-            .where(TrendingPaper.date == today)
+            .where(TrendingPaper.date == today, TrendingPaper.is_featured.is_(True))
         )
         today_count = today_result.scalar() or 0
 
-        # This week's unique papers
+        # This week's unique featured papers
         week_result = await session.execute(
             select(func.count(func.distinct(TrendingPaper.arxiv_id)))
-            .where(TrendingPaper.date >= week_ago)
+            .where(TrendingPaper.date >= week_ago, TrendingPaper.is_featured.is_(True))
         )
         week_unique = week_result.scalar() or 0
 
-        # Multi-source papers today
+        # Multi-source featured papers today
         multi_source_result = await session.execute(
             select(func.count(TrendingPaper.id))
             .where(
                 TrendingPaper.date == today,
+                TrendingPaper.is_featured.is_(True),
                 TrendingPaper.sources.contains(',')
             )
         )
