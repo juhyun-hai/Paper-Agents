@@ -268,31 +268,49 @@ export default function HaiPapers() {
             </div>
           </div>
 
-          {/* Topic chips */}
+          {/* Topic chips — count는 현재 source 필터에 따라 변경 */}
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setTopic('all')}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                topic === 'all'
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-indigo-400'
-              }`}
-            >
-              All ({topics.reduce((s, t) => s + t.total, 0)})
-            </button>
-            {topics.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTopic(t.key)}
-                className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                  topic === t.key
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-indigo-400'
-                }`}
-              >
-                {t.label} ({t.total})
-              </button>
-            ))}
+            {(() => {
+              const countOf = (t) =>
+                source === 'lab' ? t.lab_count
+                : source === 'arxiv' ? t.arxiv_count
+                : t.total
+              const allCount = topics.reduce((s, t) => s + countOf(t), 0)
+              return (
+                <>
+                  <button
+                    onClick={() => setTopic('all')}
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                      topic === 'all'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-indigo-400'
+                    }`}
+                  >
+                    All ({allCount})
+                  </button>
+                  {topics.map(t => {
+                    const c = countOf(t)
+                    const dim = c === 0
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => setTopic(t.key)}
+                        disabled={dim}
+                        className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                          topic === t.key
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : dim
+                              ? 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-800 cursor-not-allowed'
+                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-indigo-400'
+                        }`}
+                      >
+                        {t.label} ({c})
+                      </button>
+                    )
+                  })}
+                </>
+              )
+            })()}
           </div>
         </div>
       </section>
