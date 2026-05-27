@@ -10,10 +10,10 @@ const TOPICS = [
     label: '전체',
     icon: '🌐',
     examples: [
-      'HAI Lab의 최근 fault diagnosis 연구는?',
-      'Physics-Informed ML을 PHM에 어떻게 적용하나?',
-      'Bearing fault diagnosis에서 자주 쓰이는 신호 처리 기법은?',
-      'Domain adaptation으로 변동 운영 조건을 어떻게 다루나?',
+      '요즘 diffusion에서 역추론 과정의 효율을 높이는 연구는?',
+      'Transformer 모델 최신 기술 정리해줘',
+      '데이터 생성 쪽에서의 최근 연구는?',
+      'HAI Lab의 최근 연구 트렌드는?',
     ],
   },
   {
