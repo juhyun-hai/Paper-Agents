@@ -220,6 +220,110 @@ export default function PaperAgentModal({ isOpen, onClose }) {
   )
 }
 
+// Splits an LLM answer into:
+//   - a "핵심 요약" summary line (visually highlighted box)
+//   - the rest of the body
+// Then renders inline [N] citation tokens as small clickable chips.
+function AnswerBody({ text, sources }) {
+  // Pull the "**핵심 요약:** ..." line if present
+  let summary = ''
+  let body = text
+  const m = text.match(/^\s*\*\*핵심\s*요약\s*[:：]\*\*\s*([^\n]+)\n?/)
+  if (m) {
+    summary = m[1].trim()
+    body = text.slice(m[0].length).trim()
+  }
+
+  return (
+    <div>
+      {summary && (
+        <div className="mb-3 px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border-l-4 border-indigo-500">
+          <div className="text-[10px] uppercase tracking-wider text-indigo-700 dark:text-indigo-300 font-bold mb-0.5">
+            핵심 요약
+          </div>
+          <div className="text-sm text-gray-900 dark:text-gray-100 leading-snug">
+            {renderWithCitations(summary, sources)}
+          </div>
+        </div>
+      )}
+      <div className="prose prose-sm dark:prose-invert max-w-none
+                      prose-p:my-1.5 prose-p:leading-relaxed
+                      prose-ul:my-1.5 prose-ul:pl-5
+                      prose-li:my-1 prose-li:leading-snug prose-li:marker:text-indigo-500
+                      prose-strong:text-indigo-700 dark:prose-strong:text-indigo-300 prose-strong:font-semibold
+                      prose-code:text-pink-600 dark:prose-code:text-pink-300
+                      prose-code:bg-gray-100 dark:prose-code:bg-gray-900 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none">
+        <ReactMarkdown
+          components={{
+            p: ({ children }) => <p>{processChildren(children, sources)}</p>,
+            li: ({ children }) => <li>{processChildren(children, sources)}</li>,
+            strong: ({ children }) => <strong>{children}</strong>,
+            // 헤더 토큰이 들어와도 시각 노이즈 줄이기
+            h2: ({ children }) => <p className="font-semibold mt-2 mb-1">{children}</p>,
+            h3: ({ children }) => <p className="font-semibold mt-2 mb-1">{children}</p>,
+          }}
+        >
+          {body}
+        </ReactMarkdown>
+      </div>
+    </div>
+  )
+}
+
+// Replace [N] tokens in a plain string with citation chip elements.
+function renderWithCitations(text, sources) {
+  if (typeof text !== 'string') return text
+  const parts = []
+  const re = /\[(\d+)\]/g
+  let last = 0
+  let match
+  let key = 0
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index))
+    const idx = parseInt(match[1], 10) - 1
+    parts.push(<CiteChip key={`c${key++}`} index={idx + 1} src={sources[idx]} />)
+    last = match.index + match[0].length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
+}
+
+// React children pass-through that runs renderWithCitations on string parts.
+function processChildren(children, sources) {
+  const arr = Array.isArray(children) ? children : [children]
+  const out = []
+  arr.forEach((c, i) => {
+    if (typeof c === 'string') {
+      out.push(...[].concat(renderWithCitations(c, sources)).map((el, j) => (
+        typeof el === 'string' ? <span key={`s${i}-${j}`}>{el}</span> : el
+      )))
+    } else {
+      out.push(c)
+    }
+  })
+  return out
+}
+
+function CiteChip({ index, src }) {
+  if (!src) {
+    return <span className="inline-flex items-center text-[10px] font-mono align-baseline mx-0.5 px-1.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">{index}</span>
+  }
+  const isArxiv = src.is_arxiv
+  const inner = (
+    <span className={`inline-flex items-center text-[10px] font-mono font-semibold align-baseline mx-0.5 px-1.5 rounded ${
+      isArxiv
+        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-800/60'
+        : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200'
+    }`} title={src.title || ''}>
+      {index}
+    </span>
+  )
+  if (isArxiv) {
+    return <Link to={`/paper/${src.arxiv_id}`}>{inner}</Link>
+  }
+  return inner
+}
+
 function Bubble({ message, onSelect }) {
   const isUser = message.role === 'user'
   if (isUser) {
@@ -261,19 +365,9 @@ function Bubble({ message, onSelect }) {
           </div>
         )}
 
-        {/* Markdown rendered answer */}
+        {/* Markdown rendered answer with summary box + citation chips */}
         {message.content ? (
-          <div className="prose prose-sm dark:prose-invert max-w-none
-                          prose-headings:font-semibold prose-headings:text-gray-900 dark:prose-headings:text-white
-                          prose-h2:text-base prose-h2:mt-3 prose-h2:mb-1.5
-                          prose-h3:text-sm prose-h3:mt-2 prose-h3:mb-1
-                          prose-p:my-1.5 prose-p:leading-relaxed
-                          prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5
-                          prose-strong:text-indigo-700 dark:prose-strong:text-indigo-300
-                          prose-code:text-pink-600 dark:prose-code:text-pink-300
-                          prose-code:bg-gray-100 dark:prose-code:bg-gray-900 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          </div>
+          <AnswerBody text={message.content} sources={message.sources || []} />
         ) : (
           <span className="text-gray-400">…</span>
         )}
