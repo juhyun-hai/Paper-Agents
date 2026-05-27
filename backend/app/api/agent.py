@@ -51,8 +51,15 @@ def _rate_ok(ip: str) -> bool:
 SYSTEM_PROMPT = """당신은 HotPaper.ai의 Paper Agent입니다. SNU HAI Lab의 연구 분야(Industrial Foundation Models, Manufacturing AI, PHM, Signal Processing, Physics-Informed ML, Robotics 등) 관련 질문을 받습니다.
 
 답변 규칙:
-- 제공된 논문 발췌(Context)만 근거로 답변. Context에 없는 사실은 절대 만들지 말 것. 모르면 "제공된 자료에는 명시되지 않았습니다."
-- 인용은 **반드시 [1], [2] 같은 번호만** 사용하세요. (Context에 '[논문 N]' 으로 번호가 매겨져 있습니다. 그 N을 그대로 사용.)
+- 제공된 논문 발췌(Context)만 근거로 답변. Context에 없는 사실은 절대 만들지 말 것.
+- **약한 매칭 거부 규칙 (중요)**:
+  · 각 발췌에 '관련성 강함/보통/약함' 라벨이 붙어 있습니다.
+  · '약함(주제 다를 수 있음)' 발췌는 가능한 한 답변에서 인용하지 마세요.
+  · 8개 발췌가 모두 '보통' 이하이면, 솔직히 다음과 같이 답변하세요:
+    "사용자의 질문 '...'을 직접 다루는 논문을 검색 풀에서 찾지 못했습니다. 다만 인접한 주제의 논문을 소개하면 다음과 같습니다." 그 후 가장 가까운 1~3편만 인용.
+  · '강함' 또는 '보통' 매칭이 3편 이상 있으면 그것들 위주로 깊이 있게 정리.
+- 8편 모두 다루려고 하지 말 것. 진짜 관련 있는 3~5편만 깊이 있게.
+- 인용은 **반드시 [1], [2] 같은 번호만** 사용. Context의 '[논문 N]' N을 그대로 사용.
 - 절대로 [arxiv:xxxx]·[hai:xxx]·논문 제목 등 다른 형식의 인용을 본문에 넣지 마세요. UI에 이미 출처 카드가 따로 보입니다.
 - 한국어로 답변.
 
@@ -81,20 +88,26 @@ SYSTEM_PROMPT = """당신은 HotPaper.ai의 Paper Agent입니다. SNU HAI Lab의
 
 
 def _format_context(papers: list[tuple[Paper, float]], ko_map: dict[str, str]) -> str:
-    """검색된 논문 발췌를 LLM에게 보낼 형태로 정리.
-
-    영문 abstract뿐 아니라 paper_summaries의 한국어 7섹션 요약(있으면)을
-    함께 보내 LLM이 깊이 있는 답변을 생성할 수 있도록 한다.
-    """
+    """검색된 논문 발췌를 LLM에게 보낼 형태로 정리. 각 발췌에 유사도 점수와
+    관련성 등급을 표시해 LLM이 약한 매칭을 거를 수 있게 한다."""
     lines = []
     for i, (p, sim) in enumerate(papers, 1):
         tag = "🎓 HAI Lab" if p.is_lab_publication else "arXiv"
         year = p.year or (p.published_date.year if p.published_date else "n/a")
         ko = (ko_map.get(p.arxiv_id) or "").strip()
+        # 관련성 등급 (LLM이 판단할 수 있게 명시적 라벨)
+        if sim >= 0.55:
+            grade = "강함"
+        elif sim >= 0.45:
+            grade = "보통"
+        else:
+            grade = "약함(주제 다를 수 있음)"
 
-        header = f"[논문 {i}] {p.arxiv_id} | {tag} | {year}\n제목: {p.title}\n"
+        header = (
+            f"[논문 {i}] {p.arxiv_id} | {tag} | {year} | 관련성 {grade} (유사도 {sim:.2f})\n"
+            f"제목: {p.title}\n"
+        )
         if ko:
-            # 7섹션 한국어 요약은 평균 1,200~1,500자라 1,600자에서 자른다
             lines.append(header + f"한국어 요약:\n{ko[:1600]}\n")
         else:
             lines.append(header + f"초록(영문): {(p.abstract or '')[:700]}\n")
@@ -236,6 +249,19 @@ async def ask(
     if not papers:
         raise HTTPException(503, "검색 결과가 없습니다")
 
+    # 2-bis) 약한 매칭 필터링 — sim 0.45 미만은 LLM에 보내지 않는다.
+    # LLM이 약한 매칭을 '관련된 척' 합성하는 hallucination을 원천 차단.
+    # 단 모든 결과가 약하면 가장 강한 1~3편만 남기고 "weak_only" 플래그를 켠다.
+    STRONG_THRESHOLD = 0.45
+    strong = [(p, s) for p, s in papers if s >= STRONG_THRESHOLD]
+    weak_only = False
+    if strong:
+        papers = strong
+    else:
+        # 전부 약한 매칭 — 상위 3편만 남기고 솔직한 답변 유도
+        papers = papers[:3]
+        weak_only = True
+
     # 3) 한국어 요약 일괄 조회 (각 논문당 7섹션 ~1,500자)
     arxiv_ids = [p.arxiv_id for p, _ in papers]
     sum_rows = await session.execute(
@@ -247,9 +273,19 @@ async def ask(
         if txt and (aid not in ko_map or len(txt) > len(ko_map[aid])):
             ko_map[aid] = txt
 
-    # 4) Intent를 LLM에 알려서 답변 톤 조정
+    # 4) Intent + 매칭 강도를 LLM에 알려서 답변 톤 조정
     intent_note = ""
-    if intent['lab_only'] and intent['recent']:
+    if weak_only:
+        intent_note = (
+            "**중요**: 검색 풀에서 사용자 질문을 **직접 다루는 논문**을 찾지 못했습니다. "
+            "아래 발췌는 의미적으로 가장 가까운 후보일 뿐, 핵심 주제가 다를 가능성이 높습니다. "
+            "이 경우 답변 첫 줄을 정확히 다음과 같이 작성하세요:\n"
+            "`**핵심 요약:** 사용자의 질문을 직접 다루는 논문을 검색 풀에서 찾지 못했습니다.`\n"
+            "그 후 빈 줄, 그리고 '다만 인접 주제의 논문은 다음과 같습니다:' 라고 적은 뒤, "
+            "발췌 중 가장 가까운 1~3편만 **사실 그대로** (잘못 일반화하지 말고) 요약하세요. "
+            "절대 그 논문들을 사용자가 물어본 주제와 직접 연결하지 마세요.\n\n"
+        )
+    elif intent['lab_only'] and intent['recent']:
         intent_note = "참고: 사용자는 SNU HAI Lab이 최근 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
     elif intent['lab_only']:
         intent_note = "참고: 사용자는 SNU HAI Lab이 발표한 연구를 묻고 있습니다. 아래 발췌는 모두 HAI Lab 발표 논문입니다.\n\n"
