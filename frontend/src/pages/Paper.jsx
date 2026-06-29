@@ -6,12 +6,14 @@ import MiniGraph from '../components/MiniGraph.jsx'
 import { PaperCardSkeleton, SkeletonLine } from '../components/Skeleton.jsx'
 import { getPaper, getRecommendations, getMiniGraph } from '../api/client.js'
 import { getCategoryLabel, CATEGORY_TAILWIND } from '../utils/categories.js'
+import { API_BASE } from '../api/client.js'
 
 export default function Paper() {
   const { arxiv_id } = useParams()
   const [paper, setPaper] = useState(null)
   const [recommendations, setRecommendations] = useState([])
   const [graphData, setGraphData] = useState(null)
+  const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('abstract')
@@ -23,10 +25,12 @@ export default function Paper() {
       getPaper(arxiv_id),
       getRecommendations(arxiv_id).catch(() => []),
       getMiniGraph(arxiv_id).catch(() => null),
-    ]).then(([paperRes, recsRes, graphRes]) => {
+      fetch(`${API_BASE}/tags/by-paper/${arxiv_id}`).then(r => r.json()).catch(() => ({ tags: [] })),
+    ]).then(([paperRes, recsRes, graphRes, tagsRes]) => {
       setPaper(paperRes?.paper || paperRes)
       setRecommendations(recsRes?.recommendations || recsRes?.papers || recsRes || [])
       setGraphData(graphRes)
+      setTags(tagsRes?.tags || [])
       setLoading(false)
     }).catch((e) => {
       setError(typeof e === 'string' ? e : 'Failed to load paper.')
@@ -108,6 +112,23 @@ export default function Paper() {
             </span>
           )}
         </div>
+
+        {/* Dynamic tags (auto-extracted) */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold mr-1">🏷 tags</span>
+            {tags.slice(0, 12).map(t => (
+              <Link
+                key={t.name}
+                to={`/search?q=${encodeURIComponent(t.name)}`}
+                className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+                title={`${t.count}편의 다른 논문에 등장`}
+              >
+                {t.name}
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-3">
           {arxiv_url && (

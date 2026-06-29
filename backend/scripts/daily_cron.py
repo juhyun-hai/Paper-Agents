@@ -32,7 +32,30 @@ SOURCE_WEIGHTS = {
     'huggingface': 1.8,
     'arxiv_rss': 1.2,
     'crossref': 1.5,
+    'openreview': 2.0,
+    's2': 1.6,
 }
+
+# Sibling-module imports: ensure scripts/ is importable.
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Top-venue helpers (OpenReview + S2). Wrapped in try so that an environment
+# missing requests still loads the legacy collector.
+try:
+    from fetch_top_venues import (
+        ensure_schema as _tv_ensure_schema,
+        run_openreview_weekly as _tv_run_openreview,
+        run_s2_daily as _tv_run_s2,
+        run_citation_refresh as _tv_run_citations,
+        load_acceptance_lookup as _tv_load_acceptances,
+        load_citation_lookup as _tv_load_citations,
+        compute_venue_bonus as _tv_venue_bonus,
+        compute_citation_bonus as _tv_citation_bonus,
+    )
+    _TOP_VENUES_AVAILABLE = True
+except Exception as _e:  # pragma: no cover
+    print(f'⚠️ fetch_top_venues import failed: {_e}')
+    _TOP_VENUES_AVAILABLE = False
 
 
 # ──────────────────────────────────────────
@@ -242,9 +265,14 @@ async def save_papers(conn, papers):
     return saved
 
 
-async def save_trending(conn, all_source_papers, featured_top_n=25, authors_lookup=None):
-    """다중 소스 통합 trending 저장 + featured 큐레이션."""
+async def save_trending(conn, all_source_papers, featured_top_n=25,
+                         authors_lookup=None,
+                         acceptance_lookup=None,
+                         citation_lookup=None):
+    """다중 소스 통합 trending 저장 + featured 큐레이션 (v4 scoring)."""
     authors_lookup = authors_lookup or {}
+    acceptance_lookup = acceptance_lookup or {}
+    citation_lookup = citation_lookup or {}
     # HAI scoring (lazy import to keep this script standalone-runnable)
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -288,27 +316,23 @@ async def save_trending(conn, all_source_papers, featured_top_n=25, authors_look
             data['total_score'] *= 1.3
 
     # ─────────────────────────────────────────────────────────────
-    # Featured 25 선정 점수 (v3 — HF 큐레이션 강화 + HAI floor)
+    # Featured 선정 점수 (v4 — venue + citation 추가)
     # ─────────────────────────────────────────────────────────────
-    # 신호별 의미:
-    #   • HF Daily Papers upvote: 사람이 큐레이션한 taste signal — 핵심
-    #   • Cross-platform (HF + RSS + Crossref): consensus = 가장 강한 신호
-    #   • arXiv RSS 단독: novelty 신호 (그 자체로는 약함)
-    #   • HAI: 회원 floor + 키워드 비례 (전용 페이지 있으므로 캡)
+    # featured_score = base + lab_bonus + venue_bonus + citation_bonus
+    #   popularity   = log10(1 + upvotes) * 2.0
+    #   cross_mul    = {1:1.0, 2:1.8, 3:2.6, 4:3.2, 5:3.6}  (5 src 대비)
+    #   hf_bonus     = 1.0 if 'huggingface' in sources else 0
+    #   base         = (popularity + 1.0) * cross_mul + hf_bonus
     #
-    # 점수 공식:
-    #   popularity  = log10(1 + upvotes) * 2.0       (159→4.4, 50→3.4, 10→2.1)
-    #   cross_mul   = {1:1.0, 2:1.8, 3:2.6, 4:3.2}   (consensus)
-    #   hf_bonus    = 1.0 if HF에 포함되면              (큐레이션 가산)
-    #   base        = (popularity + 1.0) * cross_mul + hf_bonus
-    #   hai_bonus   = (5 if 회원 else 0) + min(kw, 5) * 1.5
-    #   featured    = base + hai_bonus
+    #   lab_bonus    = (5 if 회원) + min(kw, 5) * 1.5         # ≤ 12.5
+    #   venue_bonus  = max venue track bonus * tier_mul       # ≤ 10
+    #                  Oral 8 / Spotlight 5 / Poster 3 / Findings 2 / Workshop 1
+    #   citation_bonus = min(log10(1 + s2_citation) * 1.5, 6) # ≤ 6
     #
-    # 예시 (오늘 데이터 시뮬레이션 결과):
-    #   SciAtlas HF47+RSS:  (3.36+1)*1.8 + 1.0      = 8.85
-    #   SkillOpt HF159:     (4.4+1)*1.0 + 1.0       = 6.4
-    #   GEM-4D RSS hai_kw=3:(0+1)*1.0 + 0 + 4.5     = 5.5
-    #   HAI 회원 RSS only:  (0+1)*1.0 + 5           = 6.0  (floor 보장)
+    # 캘리브레이션 예시:
+    #   ICLR Oral + HF 300 + 4-source: 7.0 + 8.0 + 0 ≈ 22  → top
+    #   HF 2000 upvote, acceptance 없음: 8.6 + 0 + 0  ≈ 8.6 → 인기로 살아남음
+    #   arxiv-only, citation 5000:       1.0 + 0 + 5.6 ≈ 6.6 → mid-tier rescued
     # ─────────────────────────────────────────────────────────────
     for aid, data in paper_scores.items():
         # 저자 정보는 in-memory lookup 우선 (papers 테이블에 아직 없을 수 있음)
@@ -340,7 +364,7 @@ async def save_trending(conn, all_source_papers, featured_top_n=25, authors_look
 
         # 2) 크로스 플랫폼 multiplier (consensus = 최강 신호)
         n_src = len(set(data['sources']))
-        cross_mul = {1: 1.0, 2: 1.8, 3: 2.6, 4: 3.2}.get(n_src, 3.5)
+        cross_mul = {1: 1.0, 2: 1.8, 3: 2.6, 4: 3.2, 5: 3.6}.get(n_src, 3.6)
 
         # 3) HF Daily Papers 큐레이션 보너스 (사람이 픽한 신호)
         hf_bonus = 1.0 if 'huggingface' in data['sources'] else 0.0
@@ -348,13 +372,32 @@ async def save_trending(conn, all_source_papers, featured_top_n=25, authors_look
         # 4) base = (인기 + 1.0 floor) × consensus + HF 큐레이션
         base = (popularity + 1.0) * cross_mul + hf_bonus
 
-        # 5) HAI 보너스 (회원 floor + 키워드 비례, 캡)
-        hai_bonus = 0.0
+        # 5) Lab 보너스 (회원 floor + 키워드 비례, 캡 12.5)
+        lab_bonus = 0.0
         if is_member:
-            hai_bonus += 5.0
-        hai_bonus += min(hai_kw, 5) * 1.5  # 키워드 최대 +7.5
+            lab_bonus += 5.0
+        lab_bonus += min(hai_kw, 5) * 1.5  # 키워드 최대 +7.5
+        lab_bonus = min(lab_bonus, 12.5)
 
-        data['featured_score'] = base + hai_bonus
+        # 6) Venue acceptance 보너스 (OpenReview/S2 신호, 캡 10)
+        acceptances = acceptance_lookup.get(aid, [])
+        if _TOP_VENUES_AVAILABLE and acceptances:
+            venue_bonus, venue_label = _tv_venue_bonus(acceptances)
+        else:
+            venue_bonus, venue_label = 0.0, ''
+        data['venue_bonus'] = venue_bonus
+        data['venue_label'] = venue_label
+
+        # 7) Citation 보너스 (S2 citation_count, 캡 6)
+        cite = citation_lookup.get(aid, 0) or 0
+        if _TOP_VENUES_AVAILABLE:
+            citation_bonus = _tv_citation_bonus(cite)
+        else:
+            citation_bonus = 0.0
+        data['citation_count'] = cite
+        data['citation_bonus'] = citation_bonus
+
+        data['featured_score'] = base + lab_bonus + venue_bonus + citation_bonus
 
     # 정렬 및 저장
     ranked = sorted(
@@ -452,6 +495,13 @@ async def main():
 
     conn = await asyncpg.connect(DB_URL)
 
+    # 0. Schema migration (idempotent — adds source_type/title_key/venue_acceptances)
+    if _TOP_VENUES_AVAILABLE:
+        try:
+            await _tv_ensure_schema(conn)
+        except Exception as e:
+            print(f'⚠️ schema ensure failed: {e}')
+
     # 1. 다중 소스 Trending feeds 수집 (랭킹 풀)
     print('\n🔥 Step 1: 다중 소스 Trending feeds 수집 (랭킹용)...')
     hf_papers, rss_papers, crossref_papers = await asyncio.gather(
@@ -460,6 +510,45 @@ async def main():
         fetch_crossref_trending(),
     )
     all_trending = hf_papers + rss_papers + crossref_papers
+
+    # 1b. Top-venue fetchers (daily S2 rotation + citation refresh; OpenReview
+    #     Monday-only by default to respect the conservative weekly cadence).
+    conf_seed_before = 0
+    conf_seed_after = 0
+    if _TOP_VENUES_AVAILABLE:
+        try:
+            conf_seed_before = await conn.fetchval(
+                "SELECT count(*) FROM venue_acceptances"
+            ) or 0
+        except Exception as e:
+            print(f'  ⚠️ conf seed count (before): {e}')
+        weekday = datetime.now().weekday()
+        try:
+            print('\n🏛  Step 1b: S2 venue rotation (weekday-scheduled)...')
+            await _tv_run_s2(conn)
+        except Exception as e:
+            print(f'  ⚠️ s2 rotation: {e}')
+        try:
+            print('  🔄 Citation refresh (recent papers)...')
+            await _tv_run_citations(conn, since_days=30, limit=300)
+        except Exception as e:
+            print(f'  ⚠️ citation refresh: {e}')
+        # OpenReview weekly on Mondays (weekday == 0)
+        if weekday == 0 or os.environ.get('FORCE_OPENREVIEW') == '1':
+            try:
+                print('\n📜 Step 1c: OpenReview weekly sweep...')
+                await _tv_run_openreview(conn, since_days=14)
+            except Exception as e:
+                print(f'  ⚠️ openreview sweep: {e}')
+        try:
+            conf_seed_after = await conn.fetchval(
+                "SELECT count(*) FROM venue_acceptances"
+            ) or 0
+        except Exception as e:
+            print(f'  ⚠️ conf seed count (after): {e}')
+        new_conf = max(0, conf_seed_after - conf_seed_before)
+        print(f'   📊 venue_acceptances: {conf_seed_after} total '
+              f'(+{new_conf} this run)')
 
     # 2. 랭킹 풀의 모든 arxiv id에 대해 저자 batch fetch (HAI 스코어링용)
     candidate_ids = sorted({
@@ -471,10 +560,25 @@ async def main():
     authors_lookup = fetch_authors_batch(candidate_ids)
     print(f'   ✅ 저자 매칭: {len(authors_lookup)}/{len(candidate_ids)}')
 
+    # 2b. Acceptance + citation lookups for v4 scoring
+    acceptance_lookup = {}
+    citation_lookup = {}
+    if _TOP_VENUES_AVAILABLE and candidate_ids:
+        try:
+            acceptance_lookup = await _tv_load_acceptances(conn, candidate_ids)
+            citation_lookup = await _tv_load_citations(conn, candidate_ids)
+            print(f'   ✅ acceptance hits: {len(acceptance_lookup)}, '
+                  f'citation hits: {sum(1 for v in citation_lookup.values() if v > 0)}')
+        except Exception as e:
+            print(f'  ⚠️ acceptance/citation lookup: {e}')
+
     # 3. Featured Top 25 선정 (papers 저장 전에 랭킹)
-    print('\n📊 Step 3: 통합 점수 계산 + Featured Top 25 선정...')
+    print('\n📊 Step 3: 통합 점수 계산 + Featured Top 25 선정 (v4)...')
     _, featured_ids, paper_scores = await save_trending(
-        conn, all_trending, featured_top_n=25, authors_lookup=authors_lookup
+        conn, all_trending, featured_top_n=25,
+        authors_lookup=authors_lookup,
+        acceptance_lookup=acceptance_lookup,
+        citation_lookup=citation_lookup,
     )
 
     # 4. Top 25만 papers 테이블에 저장
@@ -495,12 +599,75 @@ async def main():
         })
     new_count = await save_papers(conn, to_save)
 
+    # 4a. P4 — Dynamic tag extraction (LLM keyword): featured Top 25에 적용.
+    #     concepts/paper_concepts 테이블 활용. hai_topic hardcoded 점진 폐기.
+    #     14B 모델이라 빠름 (편당 ~5초).
+    try:
+        os.environ.setdefault('TAG_MODEL', 'qwen3:14b')
+        from extract_tags import extract_tags_for_paper
+        tag_ok = 0
+        for aid in featured_ids:
+            try:
+                tags = await extract_tags_for_paper(conn, aid)
+                if tags:
+                    tag_ok += 1
+            except Exception as e:
+                print(f'  tag {aid} err: {e}')
+        print(f'  🏷  tags: {tag_ok}/{len(featured_ids)} featured papers tagged')
+    except Exception as e:
+        print(f'  ⚠️ tag extraction: {e}')
+
+    # 4b. Semantic bridge — featured/conf seed centroid로 최근 arXiv 의미 검색.
+    #     이상한 paper 거의 사라짐: 광범위 cs.* RSS 대신 의미적으로 가까운 신선분만.
+    #     별도 source='semantic_bridge'로 trending_papers에 추가 (featured에 영향 X).
+    bridge_added = 0
+    try:
+        from arxiv_semantic_bridge import run_semantic_bridge
+        bridge_results = await run_semantic_bridge(
+            conn, fresh_days=7, top_k=15, min_similarity=0.55,
+        )
+        if bridge_results:
+            # papers 테이블에 이미 있는 것만 inject (없는 건 별도 fetch 필요 — 다음 단계)
+            today = datetime.now().date()
+            for aid, title, sim in bridge_results:
+                exists = await conn.fetchrow(
+                    "SELECT id FROM papers WHERE arxiv_id = $1", aid
+                )
+                if not exists:
+                    continue
+                # 중복 방지: 이미 오늘 trending에 있는지
+                already = await conn.fetchrow(
+                    "SELECT id FROM trending_papers WHERE arxiv_id=$1 AND date=$2",
+                    aid, today
+                )
+                if already:
+                    continue
+                await conn.execute("""
+                    INSERT INTO trending_papers (
+                        arxiv_id, title, sources, trending_score, final_score,
+                        rank, multi_source_bonus, date, created_at,
+                        featured_score, is_featured, upvotes
+                    ) VALUES ($1, $2, $3, $4, $5, $6, 1.0, $7, NOW(),
+                              $8, FALSE, 0)
+                """, aid, title, json.dumps(['semantic_bridge']),
+                     sim * 10, sim * 10, 100 + bridge_added, today, sim * 10)
+                bridge_added += 1
+            print(f'  ✅ semantic_bridge inject: {bridge_added}편 (rank 100+)')
+    except Exception as e:
+        print(f'  ⚠️ semantic_bridge: {e}')
+
     # 5. 통계
     total = await conn.fetchval('SELECT count(*) FROM papers')
     trending_count = await conn.fetchval(
         "SELECT count(*) FROM trending_papers WHERE DATE(created_at) = $1",
         datetime.now().date()
     )
+
+    # Conf-first quota stats (P1 visibility — no pipeline change yet).
+    conf_in_featured = len(featured_ids & set(acceptance_lookup.keys())) \
+        if acceptance_lookup else 0
+    arxiv_pool = len(candidate_ids)
+    new_conf_this_run = max(0, conf_seed_after - conf_seed_before)
 
     elapsed = (datetime.now() - start).total_seconds()
     print(f'\n{"="*60}')
@@ -509,6 +676,10 @@ async def main():
     print(f'   신규 추가: {new_count}개 (Top 25 only)')
     print(f'   오늘 Trending: {trending_count}개')
     print(f'   Active Sources: HuggingFace({len(hf_papers)}), arXiv RSS({len(rss_papers)}), Crossref({len(crossref_papers)})')
+    print(f'✅ Conf seed: {new_conf_this_run} (total {conf_seed_after}) / '
+          f'arXiv pool: {arxiv_pool} / '
+          f'featured: {len(featured_ids)} (conf: {conf_in_featured}) / '
+          f'semantic_bridge: {bridge_added}')
     print(f'{"="*60}')
 
     await conn.close()

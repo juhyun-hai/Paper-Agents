@@ -5,6 +5,7 @@ import PaperCard from '../components/PaperCard.jsx'
 import { PaperCardSkeleton } from '../components/Skeleton.jsx'
 import HotTopics from '../components/HotTopics.jsx'
 import FeaturedSection from '../components/FeaturedSection.jsx'
+import PopularTags from '../components/PopularTags.jsx'
 import { getStats, getTrends } from '../api/client.js'
 
 const FEATURES = [
@@ -242,6 +243,7 @@ export default function Home() {
       <section className="bg-gray-50 dark:bg-gray-900 py-16">
         <div className="max-w-5xl mx-auto px-4">
           <HotTopics />
+          <PopularTags limit={40} minCount={2} />
         </div>
       </section>
 
