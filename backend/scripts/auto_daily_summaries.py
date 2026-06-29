@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 import time
 import traceback
@@ -140,13 +141,14 @@ def _try_extract_body(arxiv_id: str) -> tuple[str | None, str | None]:
         return None, None
 
 
-def generate_summary(arxiv_id: str, title: str, abstract: str) -> tuple[str | None, bool]:
+def generate_summary(arxiv_id: str, title: str, abstract: str) -> tuple[str | None, bool, str | None]:
     """Ollama (qwen3:32b) 로컬 호출.
 
     1) ar5iv 본문 추출 시도 → 성공 시 본문 포함 prompt
     2) 실패 시 abstract-only fallback (기존 동작)
 
-    Returns: (summary_text, used_ar5iv)
+    Returns: (summary_text, used_ar5iv, body_text)
+      body_text — verifier가 수치 매칭에 쓸 원본 본문 (없으면 None)
     """
     body, src = _try_extract_body(arxiv_id)
     if body:
@@ -189,22 +191,84 @@ def generate_summary(arxiv_id: str, title: str, abstract: str) -> tuple[str | No
             )
             r.raise_for_status()
             text = r.json().get('message', {}).get('content', '').strip() or None
-            return text, used_ar5iv
+            return text, used_ar5iv, body
     except Exception as e:
         print(f"  ⚠️ Ollama err: {e}")
-        return None, used_ar5iv
+        return None, used_ar5iv, body
+
+
+# ---------------------------------------------------------------------------
+# P6: Verifier loop — minimal hallucination guard.
+# 요약에 등장한 수치(73.2%, 1.6×, 100K …)가 abstract 또는 ar5iv 본문에
+# 실제로 등장하는지 grep. 매칭 안 되는 비율이 UNVERIFIED_THRESHOLD 이상이면
+# +unverified 태그만 붙이고 통과 (사이트에서 사용자가 직접 판단 가능).
+# 절대 paper를 reject 하지 않음 — 가시화가 목적.
+# ---------------------------------------------------------------------------
+UNVERIFIED_THRESHOLD = float(os.environ.get('VERIFIER_THRESHOLD', '0.30'))
+
+# 의미있는 수치만: 소수점 / % / 3자리+ / ×배수
+_NUM_PATTERN = re.compile(r'\d+(?:\.\d+)?%?')
+
+
+def _candidate_numbers(text: str) -> list[str]:
+    """검증 가치가 있는 수치만 추출. 한 자리 정수(1, 2, 3) 같은 노이즈 제외."""
+    out: list[str] = []
+    for m in _NUM_PATTERN.finditer(text):
+        s = m.group(0)
+        core = s.rstrip('%')
+        # 소수점 포함 / % 포함 / 3자리 이상 정수만 검증 대상
+        if '.' in core or s.endswith('%') or len(core) >= 3:
+            out.append(s)
+    return out
+
+
+def verify_summary_numbers(
+    summary_text: str, abstract: str, body: str | None,
+) -> tuple[bool, float, list[str], int]:
+    """요약 내 수치가 abstract/body에 등장하는지 grep.
+
+    Returns:
+        verified: True면 통과 (unmatched < threshold)
+        unmatched_ratio: 매칭 실패 비율 (0.0~1.0)
+        unmatched_examples: 매칭 실패 수치 샘플 (최대 5개)
+        checked_count: 검증한 수치 총 개수
+    """
+    nums = _candidate_numbers(summary_text)
+    if not nums:
+        # 검증할 수치 없음 → 안전 통과 (false positive 방지)
+        return True, 0.0, [], 0
+
+    source = (abstract or '') + '\n' + (body or '')
+    unmatched: list[str] = []
+    for n in nums:
+        core = n.rstrip('%')
+        # exact substring 또는 % 떼고 등장하면 매칭 인정
+        if n in source or core in source:
+            continue
+        unmatched.append(n)
+
+    ratio = len(unmatched) / len(nums)
+    verified = ratio < UNVERIFIED_THRESHOLD
+    return verified, ratio, unmatched[:5], len(nums)
 
 
 async def save_summary(conn, arxiv_id: str, summary_text: str, figures: list,
-                        used_ar5iv: bool = False):
+                        used_ar5iv: bool = False, verified: bool = True):
     """Per-paper transaction. 멱등 (DELETE+INSERT).
 
     used_ar5iv: True면 generation_model 태그에 '+ar5iv' 표시 (소스 추적용).
+    verified:   False면 '+unverified' 태그 (수치 grep 매칭률 < threshold).
+                schema에 별도 컬럼 없으므로 generation_model 문자열로 가시화.
     """
     async with conn.transaction():
         await conn.execute("DELETE FROM paper_summaries WHERE arxiv_id = $1", arxiv_id)
         word_count = len(summary_text.split())
-        model_tag = f"Ollama {MODEL}{'+ar5iv' if used_ar5iv else ''} (auto-cron)"
+        tags = ''
+        if used_ar5iv:
+            tags += '+ar5iv'
+        if not verified:
+            tags += '+unverified'
+        model_tag = f"Ollama {MODEL}{tags} (auto-cron)"
         await conn.execute("""
             INSERT INTO paper_summaries (
                 arxiv_id, summary_text, summary_type, generation_model,
@@ -262,7 +326,7 @@ async def main():
             })
             return
 
-        ok, fail, fail_ids = 0, 0, []
+        ok, fail, unverified_count, fail_ids = 0, 0, 0, []
         for i, t in enumerate(targets, 1):
             aid = t['arxiv_id']
             summary_for = aid
@@ -271,11 +335,22 @@ async def main():
 
             # 1) Generate (network/llm error는 fail 처리, 다음 paper로)
             #    ar5iv 본문 활용 시도 → 실패 시 abstract-only fallback
-            summary, used_ar5iv = generate_summary(aid, t['title'], t['abstract'])
+            summary, used_ar5iv, body = generate_summary(aid, t['title'], t['abstract'])
             if not summary or len(summary) < 200:
                 fail += 1
                 fail_ids.append(aid)
                 continue
+
+            # 1.5) Verifier (P6): 수치 grep — abstract/body에 없으면 +unverified 태그
+            verified, unmatched_ratio, unmatched_ex, checked = verify_summary_numbers(
+                summary, t['abstract'], body,
+            )
+            if not verified:
+                unverified_count += 1
+                print(
+                    f"    ⚠️ verify fail: {unmatched_ratio:.0%} unmatched "
+                    f"({len(unmatched_ex)}/{checked} shown) e.g. {unmatched_ex}"
+                )
 
             # 2) Figures (실패해도 빈 list로 진행)
             try:
@@ -286,17 +361,27 @@ async def main():
 
             # 3) DB 저장 (per-paper transaction)
             try:
-                await save_summary(conn, aid, summary, figs, used_ar5iv=used_ar5iv)
+                await save_summary(
+                    conn, aid, summary, figs,
+                    used_ar5iv=used_ar5iv, verified=verified,
+                )
                 ok += 1
                 src_tag = '+ar5iv' if used_ar5iv else 'abstract-only'
-                print(f"    ✅ saved [{src_tag}] ({len(summary)} chars, {len(figs)} figs, {time.time()-t0:.1f}s)")
+                ver_tag = '' if verified else ' +unverified'
+                print(
+                    f"    ✅ saved [{src_tag}{ver_tag}] "
+                    f"({len(summary)} chars, {len(figs)} figs, {time.time()-t0:.1f}s)"
+                )
             except Exception as e:
                 fail += 1
                 fail_ids.append(aid)
                 print(f"    ❌ db err: {e}")
 
         elapsed = time.time() - started
-        print(f"\n✅ Done — success {ok}, fail {fail}, elapsed {elapsed:.0f}s")
+        print(
+            f"\n✅ Done — success {ok}, fail {fail}, "
+            f"unverified {unverified_count}, elapsed {elapsed:.0f}s"
+        )
         # P0 핵심 fix: 0편 처리는 fail로 간주 → healthchecks가 자동 alarm 발송.
         # 그동안 무음 4일 실패는 cron이 'success ping with processed=0' 보내서
         # dashboard만 보면 정상으로 보였기 때문.
@@ -309,6 +394,7 @@ async def main():
         else:
             heartbeat('', {
                 'processed': ok, 'failed': fail, 'fail_ids': fail_ids[:10],
+                'unverified': unverified_count,
                 'lookback_days': LOOKBACK_DAYS, 'elapsed_sec': round(elapsed, 1),
                 'model': MODEL,
             })

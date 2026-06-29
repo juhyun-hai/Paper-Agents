@@ -8,6 +8,7 @@ import Search from './pages/Search';
 import Paper from './pages/Paper';
 import HaiPapers from './pages/HaiPapers';
 import Ask from './pages/Ask';
+import TagPage from './pages/TagPage';
 import './App.css';
 
 function App() {
@@ -25,6 +26,8 @@ function App() {
             <Route path="/paper/:arxiv_id" element={<Paper />} />
             <Route path="/hai" element={<HaiPapers />} />
             <Route path="/ask" element={<Ask />} />
+            <Route path="/tag/:tagname" element={<TagPage />} />
+            <Route path="/tags/:tagname" element={<TagPage />} />
           </Routes>
         </main>
 

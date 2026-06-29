@@ -6,7 +6,7 @@ import { API_BASE } from '../api/client'
  * Home에 표시하는 인기 동적 tag chip cloud.
  * - /api/tags/popular 에서 paper_count 내림차순 가져옴
  * - tag 크기는 paper_count 비례 (시각적으로 더 인기 있는 게 큼)
- * - 클릭하면 /search?q=<tag> 로 이동
+ * - 클릭하면 /tag/<tag> 로 이동 (tag-filtered paper list)
  */
 export default function PopularTags({ limit = 40, minCount = 2 }) {
   const [tags, setTags] = useState([])
@@ -50,7 +50,7 @@ export default function PopularTags({ limit = 40, minCount = 2 }) {
           return (
             <Link
               key={t.name}
-              to={`/search?q=${encodeURIComponent(t.name)}`}
+              to={`/tag/${encodeURIComponent(t.name)}`}
               style={{ fontSize: `${fontSize}px` }}
               className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border transition-colors
                 bg-indigo-${intensity > 75 ? '100' : '50'} dark:bg-indigo-900/${intensity > 75 ? '40' : '20'}

@@ -27,6 +27,12 @@ from .api.summary import router as summary_router
 from .api.agent import router as agent_router
 from .api.tags import router as tags_router
 
+# Plugin gates (fork-friendly isolation; see docs/PLUGIN_HAI.md).
+# Default ON to preserve current behavior on the canonical deployment.
+ENABLE_HAI_PLUGIN = os.getenv("ENABLE_HAI_PLUGIN", "true").strip().lower() not in (
+    "0", "false", "no", "off", ""
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -187,7 +193,13 @@ app.include_router(trending_router)
 app.include_router(hot_topics_router)
 app.include_router(summary_router)
 app.include_router(featured_router)
-app.include_router(hai_router)
+if ENABLE_HAI_PLUGIN:
+    # Use the plugin re-export so disabling lives in one place.
+    from .plugins.hai.router import router as hai_plugin_router
+    app.include_router(hai_plugin_router)
+    print("🔌 Plugin enabled: HAI (set ENABLE_HAI_PLUGIN=false to disable)")
+else:
+    print("🔌 Plugin disabled: HAI (ENABLE_HAI_PLUGIN=false)")
 app.include_router(agent_router)
 app.include_router(tags_router)
 

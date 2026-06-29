@@ -120,9 +120,9 @@ export default function Paper() {
             {tags.slice(0, 12).map(t => (
               <Link
                 key={t.name}
-                to={`/search?q=${encodeURIComponent(t.name)}`}
+                to={`/tag/${encodeURIComponent(t.name)}`}
                 className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
-                title={`${t.count}편의 다른 논문에 등장`}
+                title={`${t.count}편의 다른 논문에 등장 — 클릭하면 태그 필터 페이지로 이동`}
               >
                 {t.name}
               </Link>
