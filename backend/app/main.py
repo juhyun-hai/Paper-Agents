@@ -26,6 +26,7 @@ from .api.trending import (
 from .api.summary import router as summary_router
 from .api.agent import router as agent_router
 from .api.tags import router as tags_router
+from .api.feed import router as feed_router
 
 # Plugin gates (fork-friendly isolation; see docs/PLUGIN_HAI.md).
 # Default ON to preserve current behavior on the canonical deployment.
@@ -202,6 +203,7 @@ else:
     print("🔌 Plugin disabled: HAI (ENABLE_HAI_PLUGIN=false)")
 app.include_router(agent_router)
 app.include_router(tags_router)
+app.include_router(feed_router)
 
 
 # Root endpoints

@@ -9,6 +9,7 @@ import Paper from './pages/Paper';
 import HaiPapers from './pages/HaiPapers';
 import Ask from './pages/Ask';
 import TagPage from './pages/TagPage';
+import Bookmarks from './pages/Bookmarks';
 import './App.css';
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
             <Route path="/ask" element={<Ask />} />
             <Route path="/tag/:tagname" element={<TagPage />} />
             <Route path="/tags/:tagname" element={<TagPage />} />
+            <Route path="/bookmarks" element={<Bookmarks />} />
           </Routes>
         </main>
 

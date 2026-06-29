@@ -7,6 +7,7 @@ import { PaperCardSkeleton, SkeletonLine } from '../components/Skeleton.jsx'
 import { getPaper, getRecommendations, getMiniGraph } from '../api/client.js'
 import { getCategoryLabel, CATEGORY_TAILWIND } from '../utils/categories.js'
 import { API_BASE } from '../api/client.js'
+import BookmarkButton from '../components/BookmarkButton.jsx'
 
 export default function Paper() {
   const { arxiv_id } = useParams()
@@ -94,7 +95,10 @@ export default function Paper() {
 
       {/* Header */}
       <div className="space-y-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight">{title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight flex-1">{title}</h1>
+          <BookmarkButton arxivId={arxiv_id} />
+        </div>
 
         <p className="text-lg text-gray-600 dark:text-gray-300">{displayAuthors}</p>
 
