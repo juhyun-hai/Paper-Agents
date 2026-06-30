@@ -21,7 +21,7 @@ export default function Alerts() {
         setLoading(false)
         // 각 검색에 대해 매칭 로드
         list.forEach(s => {
-          fetch(`${API_BASE}/saved-searches/${s.id}/matches?days=14`)
+          fetch(`${API_BASE}/saved-searches/${s.id}/matches?days=60`)
             .then(r => r.json())
             .then(md => setMatches(prev => ({ ...prev, [s.id]: md.matches || [] })))
         })
@@ -119,7 +119,7 @@ export default function Alerts() {
               {s.tag && <span>🏷 <code>{s.tag}</code></span>}
               {s.keyword && <span>🔍 "<code>{s.keyword}</code>"</span>}
               {s.category && <span>📂 <code>{s.category}</code></span>}
-              {matches[s.id] && <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-semibold">최근 14일 {matches[s.id].length}편</span>}
+              {matches[s.id] && <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-semibold">최근 60일 {matches[s.id].length}편</span>}
             </div>
             <ul className="space-y-2">
               {(matches[s.id] || []).slice(0, 5).map(m => (

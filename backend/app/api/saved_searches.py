@@ -65,7 +65,7 @@ async def delete_saved_search(sid: int, client_id: str = Query(..., min_length=8
 
 
 @router.get("/{sid}/matches")
-async def get_matches(sid: int, days: int = Query(7, ge=1, le=30),
+async def get_matches(sid: int, days: int = Query(30, ge=1, le=180),
                        session: AsyncSession = Depends(get_async_session)):
     saved = (await session.execute(text(
         "SELECT * FROM saved_searches WHERE id = :i"
@@ -77,12 +77,16 @@ async def get_matches(sid: int, days: int = Query(7, ge=1, le=30),
     conditions = ["p.published_date >= :cutoff"]
     params = {'cutoff': cutoff}
     if s['tag']:
+        # 정확 매칭 + prefix 매칭 (예: 'transformer' → 'transformer', 'transformer-block', …)
         conditions.append("""EXISTS (
             SELECT 1 FROM paper_concepts pc
             JOIN concepts c ON c.id = pc.concept_id
-            WHERE pc.paper_id = p.id AND c.type='keyword' AND lower(c.name) = lower(:tg)
+            WHERE pc.paper_id = p.id AND c.type='keyword'
+              AND (lower(c.name) = lower(:tg)
+                   OR lower(c.name) LIKE lower(:tg_prefix))
         )""")
         params['tg'] = s['tag']
+        params['tg_prefix'] = f"{s['tag'].lower()}-%"
     if s['keyword']:
         conditions.append("(p.title ILIKE :kw OR p.abstract ILIKE :kw)")
         params['kw'] = f"%{s['keyword']}%"
