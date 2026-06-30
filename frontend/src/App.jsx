@@ -58,6 +58,28 @@ function App() {
                 </div>
               </div>
 
+              {/* Subscribe / Tools */}
+              <div className="flex items-center gap-4 text-sm">
+                <a
+                  href="/api/feed/rss"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-white hover:text-orange-400 transition-colors"
+                  title="Feedly/Inoreader 등록"
+                >
+                  <span className="text-orange-500">📡</span> RSS
+                </a>
+                <a
+                  href="https://github.com/juhyun-hai/Paper-Agents/tree/master/mcp_server"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-white hover:text-indigo-400 transition-colors"
+                  title="Claude Desktop / Cursor에서 hotpaper 검색"
+                >
+                  <span className="text-indigo-400">🔌</span> MCP
+                </a>
+              </div>
+
               {/* Developer */}
               <div className="text-center md:text-right">
                 <p className="text-sm">

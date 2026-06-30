@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Navigate } from 'react-router-dom'
 import SearchBar from '../components/SearchBar.jsx'
 import PaperCard from '../components/PaperCard.jsx'
 import Sidebar from '../components/Sidebar.jsx'
@@ -11,6 +11,11 @@ const PAGE_SIZE = 10
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
+  const tagParam = searchParams.get('tag')
+  // /search?tag=X 는 정확 매칭 tag 페이지로 자동 redirect (audit immediate_actions)
+  if (tagParam) {
+    return <Navigate to={`/tag/${encodeURIComponent(tagParam)}`} replace />
+  }
 
   const [papers, setPapers] = useState([])
   const [total, setTotal] = useState(0)
