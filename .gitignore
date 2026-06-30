@@ -68,4 +68,5 @@ backend/logs/
 cloudflared
 ngrok.tgz
 =*
-.claude/
+.claude/demo/seed.sql
+demo/seed*.sql

@@ -1,0 +1,75 @@
+# HotPaper Demo — 강연 청중이 5분 안에 자기 화면에서 보는 mode.
+#
+# 차이 (운영용 vs demo):
+# - 외부 LLM 호출 X (Ollama 안 띄움) — 모델 다운로드 5GB 회피
+# - 처음 7일치 paper 200편만 seed (small dump, 50MB)
+# - Backend는 read-only (수집 cron 안 도라봄)
+# - Cloudflare 없음 — localhost:8001 (backend), localhost:5174 (frontend)
+# - DB는 ephemeral (volume 없음 — 끄면 사라짐)
+#
+# 사용:
+#   docker compose -f docker-compose.demo.yml up -d
+#   open http://localhost:5174   # frontend
+#   open http://localhost:8001/docs   # backend swagger
+#
+# 종료:
+#   docker compose -f docker-compose.demo.yml down
+
+services:
+  postgres-demo:
+    image: pgvector/pgvector:pg17
+    container_name: hotpaper-demo-pg
+    environment:
+      POSTGRES_DB: hotpaper_demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo_local_only
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./demo/seed.sql:/docker-entrypoint-initdb.d/01-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d hotpaper_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend-demo:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hotpaper-demo-api
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://demo:demo_local_only@postgres-demo:5432/hotpaper_demo
+      DB_URL: postgresql://demo:demo_local_only@postgres-demo:5432/hotpaper_demo
+      # Demo mode: 사용자 LLM key 없이도 모든 read endpoint 작동
+      DEMO_MODE: "1"
+      DISABLE_AGENT: "1"
+      ENABLE_HAI_PLUGIN: "false"
+    ports:
+      - "8001:8000"
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log
+
+  frontend-demo:
+    image: node:20-alpine
+    container_name: hotpaper-demo-web
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    environment:
+      VITE_API_BASE: http://localhost:8001
+    ports:
+      - "5174:5174"
+    command: sh -c "npm install --silent && npm run dev -- --host 0.0.0.0 --port 5174"
+
+# 청중 시연 흐름 (강연용):
+# 1. git clone https://github.com/juhyun-hai/Paper-Agents
+# 2. cd Paper-Agents
+# 3. docker compose -f docker-compose.demo.yml up
+# 4. ~3분 대기 (이미지 pull + npm install)
+# 5. http://localhost:5174 — featured + tag chip + paper 상세
+# 6. http://localhost:8001/api/feed/today.json — JSON API
+# 7. (선택) templates/CUSTOMIZE.md 보고 자기 keyword로 변경
