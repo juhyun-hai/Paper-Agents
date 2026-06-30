@@ -11,6 +11,7 @@ const Navigation = ({ onOpenAgent }) => {
     { path: '/trending', label: 'Trending', icon: '🔥', description: 'Discover hottest papers' },
     { path: '/hai',      label: 'HAI Picks', icon: '🎓', description: 'HAI Lab featured papers' },
     { path: '/bookmarks', label: 'Bookmarks', icon: '🔖', description: '내 북마크 (브라우저 저장)' },
+    { path: '/alerts',   label: 'Alerts',    icon: '🔔', description: '관심 tag/키워드 알림 (브라우저 저장)' },
     // Paper Agent는 라우트 이동이 아니라 글로벌 모달이라 별도 처리
     { kind: 'action',    action: 'openAgent', label: 'Paper Agent', icon: '🤖', description: 'AI research assistant (beta)' },
   ];

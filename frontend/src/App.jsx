@@ -10,6 +10,7 @@ import HaiPapers from './pages/HaiPapers';
 import Ask from './pages/Ask';
 import TagPage from './pages/TagPage';
 import Bookmarks from './pages/Bookmarks';
+import Alerts from './pages/Alerts';
 import './App.css';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
             <Route path="/tag/:tagname" element={<TagPage />} />
             <Route path="/tags/:tagname" element={<TagPage />} />
             <Route path="/bookmarks" element={<Bookmarks />} />
+            <Route path="/alerts" element={<Alerts />} />
           </Routes>
         </main>
 
