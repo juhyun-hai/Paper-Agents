@@ -240,9 +240,15 @@ export default function Home() {
       </section>
 
       {/* Hot Topics */}
-      <section className="bg-gray-50 dark:bg-gray-900 py-16">
+      <section className="bg-gray-50 dark:bg-gray-900 pt-16 pb-8">
         <div className="max-w-5xl mx-auto px-4">
           <HotTopics />
+        </div>
+      </section>
+
+      {/* Popular Tags — LLM 자동 추출 (별도 section으로 가시화) */}
+      <section className="bg-gray-50 dark:bg-gray-900 pb-16">
+        <div className="max-w-5xl mx-auto px-4">
           <PopularTags limit={40} minCount={2} />
         </div>
       </section>

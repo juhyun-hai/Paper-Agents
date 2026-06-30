@@ -5,15 +5,18 @@ const Navigation = ({ onOpenAgent }) => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // 메인 navigation — 핵심 browsing 만 (label + icon).
   const navItems = [
     { path: '/',         label: 'Home',     icon: '🏠', description: 'Hot Paper homepage' },
     { path: '/search',   label: 'Search',   icon: '🔍', description: 'Search and browse papers' },
     { path: '/trending', label: 'Trending', icon: '🔥', description: 'Discover hottest papers' },
     { path: '/hai',      label: 'HAI Picks', icon: '🎓', description: 'HAI Lab featured papers' },
-    { path: '/bookmarks', label: 'Bookmarks', icon: '🔖', description: '내 북마크 (브라우저 저장)' },
-    { path: '/alerts',   label: 'Alerts',    icon: '🔔', description: '관심 tag/키워드 알림 (브라우저 저장)' },
-    // Paper Agent는 라우트 이동이 아니라 글로벌 모달이라 별도 처리
-    { kind: 'action',    action: 'openAgent', label: 'Paper Agent', icon: '🤖', description: 'AI research assistant (beta)' },
+  ];
+  // 우측 user tools — icon only, 호버 시 label.
+  const userTools = [
+    { path: '/bookmarks', icon: '🔖', label: 'Bookmarks', description: '내 북마크' },
+    { path: '/alerts',    icon: '🔔', label: 'Alerts',    description: '관심 tag/키워드 알림' },
+    { kind: 'action', action: 'openAgent', icon: '🤖', label: 'Paper Agent', description: 'AI 연구 비서 (beta)' },
   ];
 
   return (
@@ -38,36 +41,50 @@ const Navigation = ({ onOpenAgent }) => {
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:block">
-            <div className="flex items-center space-x-6">
+          {/* Desktop Navigation — 메인 4개 (label) + 우측 user tools 3개 (icon only) */}
+          <div className="hidden md:flex items-center gap-4">
+            {/* 메인 */}
+            <div className="flex items-center space-x-2">
               {navItems.map((item) => {
-                if (item.kind === 'action') {
-                  return (
-                    <button
-                      key={item.label}
-                      onClick={() => onOpenAgent && onOpenAgent()}
-                      className="px-3 py-2 rounded-lg text-sm font-medium transition-colors text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
-                    >
-                      <span className="mr-2">{item.icon}</span>
-                      {item.label}
-                    </button>
-                  );
-                }
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
-                    key={item.path}
-                    to={item.path}
+                    key={item.path} to={item.path}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200'
                         : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                     }`}
                   >
-                    <span className="mr-2">{item.icon}</span>
-                    {item.label}
+                    <span className="mr-2">{item.icon}</span>{item.label}
                   </Link>
+                );
+              })}
+            </div>
+            {/* 구분선 */}
+            <div className="w-px h-6 bg-gray-300 dark:bg-gray-700"></div>
+            {/* User tools — icon only */}
+            <div className="flex items-center space-x-1">
+              {userTools.map((item) => {
+                const isActive = item.path && location.pathname === item.path;
+                const base = "p-2 rounded-lg text-lg transition-colors";
+                if (item.kind === 'action') {
+                  return (
+                    <button key={item.label} onClick={() => onOpenAgent && onOpenAgent()}
+                      title={`${item.label} — ${item.description}`}
+                      className={`${base} text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30`}
+                    >{item.icon}</button>
+                  );
+                }
+                return (
+                  <Link key={item.path} to={item.path}
+                    title={`${item.label} — ${item.description}`}
+                    className={`${base} ${
+                      isActive
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >{item.icon}</Link>
                 );
               })}
             </div>
@@ -125,7 +142,7 @@ const Navigation = ({ onOpenAgent }) => {
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 border-t border-gray-200 bg-gray-50">
-              {navItems.map((item) => {
+              {[...navItems, ...userTools].map((item) => {
                 if (item.kind === 'action') {
                   return (
                     <button

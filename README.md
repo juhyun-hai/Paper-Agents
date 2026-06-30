@@ -1,6 +1,66 @@
-# Paper Agent - arXiv Paper Ingestion & Summarization
+# HotPaper.ai · AI 논문 큐레이션 + 한국어 deep summary
 
-An arXiv-first daily ingestion and summarization system that collects papers, generates structured summaries, and detects trending research keywords.
+> **No ads · No sponsored ranking** — 학술 도구는 학술적으로.
+
+매일 03시 자동 수집 (HuggingFace + arXiv + Conference) → Featured Top 25 + ar5iv 본문 기반 한국어 deep summary + 동적 tag 추출 → 사이트/RSS/MCP/Saved-search 제공.
+
+## 🌐 사이트
+- **운영**: https://hotpaper.ai
+- **RSS**: https://hotpaper.ai/api/feed/rss (Feedly/Inoreader)
+- **MCP**: [mcp_server/README.md](mcp_server/README.md) — Claude Desktop/Cursor에서 직접 검색
+- **데모**: `docker compose -f docker-compose.demo.yml up` → localhost:5174
+
+## 🧠 핵심 기능
+
+| 영역 | 무엇 | 어디 |
+|---|---|---|
+| **수집** | HF Daily + arXiv RSS + Crossref + S2 conf venue 통합, multi-source bonus | `scripts/daily_cron.py` (03시 KST) |
+| **점수** | featured_score v4 (popularity × cross × venue × HAI), Top 25 선정 | 동상 |
+| **요약** | Ollama qwen3:32b + ar5iv 본문 활용 (PDF 0 다운로드) → 한국어 7섹션 deep summary | `scripts/auto_daily_summaries.py` (04시 KST) |
+| **환각 차단** | P6 Verifier — 요약 수치를 본문에 grep, 미매칭 비율 30% 초과 시 `+unverified` 태그 | 동상 |
+| **동적 카테고리** | LLM 자동 tag 추출 (paper당 5-10), `concepts` + `paper_concepts` | `scripts/extract_tags.py` |
+| **의미 검색** | Conf seed centroid → 최근 arXiv top-K cosine (BGE-m3) | `scripts/arxiv_semantic_bridge.py` |
+| **사이트 layer** | Tag chip + Popular Tags cloud + Bookmarks (localStorage) + Alerts (saved search) + RSS feed | `frontend/src/` |
+| **알람** | Healthchecks.io heartbeat, 0편이면 fail ping → 자동 메일 알람 | `scripts/auto_daily_summaries.py` |
+| **운영** | cron + venv python, logrotate (일 회전, 14일 보관), HAI plugin isolation (`ENABLE_HAI_PLUGIN=false`) | `scripts/run_daily.sh`, `scripts/logrotate.conf` |
+
+## 📚 문서
+
+- [`docs/PLUGIN_HAI.md`](docs/PLUGIN_HAI.md) — fork할 때 HAI Lab 코드 끄는 방법
+- [`docs/TALK_OUTLINE.md`](docs/TALK_OUTLINE.md) — 강연 outline skeleton
+- [`templates/CUSTOMIZE.md`](templates/CUSTOMIZE.md) — 자기 분야로 customize
+- [`mcp_server/README.md`](mcp_server/README.md) — Claude Desktop/Cursor 등록
+
+## ⚙️ Cron 등록 권장
+
+```cron
+# 매일 03시 KST: 수집 + Featured + tag + semantic bridge + figure backfill + embedding
+0 3 * * * /home/.../backend/scripts/run_daily.sh >> /home/.../backend/logs/hotpaper_daily.log 2>&1
+
+# 매일 04시 KST: 한국어 deep summary (Ollama qwen3:32b + ar5iv)
+0 4 * * * cd /home/.../backend && /home/.../venv/bin/python3 -u scripts/auto_daily_summaries.py >> /home/.../backend/logs/auto_summaries.log 2>&1
+
+# 매일 09시 KST: saved-search 이메일 digest (SMTP env 있을 때)
+0 9 * * * cd /home/.../backend && /home/.../venv/bin/python3 -u scripts/send_alert_digest.py >> /home/.../backend/logs/alert_digest.log 2>&1
+
+# 매일 00:05: log rotation
+5 0 * * * /usr/sbin/logrotate -s /home/.../backend/logs/.logrotate.state /home/.../backend/scripts/logrotate.conf
+```
+
+## 🚀 1편 직접 처리
+
+```bash
+# 수집 + 점수 (시간 짧으면)
+venv/bin/python backend/scripts/daily_cron.py
+
+# 1편 deep summary (Ollama 32B + ar5iv 자동 시도)
+SUMMARY_LOOKBACK_DAYS=1 venv/bin/python backend/scripts/auto_daily_summaries.py
+```
+
+---
+
+## 옛 Quick Start (Phase 1 MVP)
+
 
 ## Quick Start
 
