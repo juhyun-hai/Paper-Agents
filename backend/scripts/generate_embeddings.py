@@ -57,11 +57,12 @@ async def generate_all_embeddings():
             print(f"\n🎉 Embedding generation completed!")
             print(f"📊 Total embeddings generated: {total_updated}")
 
-            # Verify final state
+            # Verify final state (SQLAlchemy 2.x: select(func.count()) not select().count())
+            from sqlalchemy import func
             embedded_count = await session.scalar(
-                select(Paper).where(Paper.full_embedding.is_not(None)).count()
+                select(func.count()).select_from(Paper).where(Paper.full_embedding.is_not(None))
             )
-            total_count = await session.scalar(select(Paper).count())
+            total_count = await session.scalar(select(func.count()).select_from(Paper))
 
             print(f"📈 Final state: {embedded_count}/{total_count} papers with embeddings")
 
