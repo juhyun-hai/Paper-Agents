@@ -41,9 +41,22 @@ async def get_today_trending(
     limit: int = Query(20, le=200, description="Number of trending papers"),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """Get today's trending papers."""
+    """Get today's trending papers.
+
+    03시 cron 전 새벽 시간대엔 오늘 데이터가 없으므로
+    가장 최근 featured 날짜로 fallback (빈 화면 방지).
+    """
     try:
         today = date.today()
+        has_today = await session.scalar(
+            select(func.count(TrendingPaper.id)).where(TrendingPaper.date == today)
+        )
+        if not has_today:
+            latest = await session.scalar(
+                select(func.max(TrendingPaper.date))
+            )
+            if latest:
+                today = latest
 
         result = await session.execute(
             select(TrendingPaper)

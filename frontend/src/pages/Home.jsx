@@ -16,7 +16,9 @@ export default function Home() {
 
   useEffect(() => {
     getStats().then(setStats).catch(() => {})
-    fetch(`${API_BASE}/hai/papers?limit=5`)
+    // 사이드바 HAI Picks = 최근 arXiv 중 HAI 연구 분야 관련 논문.
+    // (lab 자체 출판물 아카이브는 /hai 페이지에서 — 여긴 '요즘 뭐가 나오나')
+    fetch(`${API_BASE}/hai/papers?limit=5&source=arxiv&sort=recent`)
       .then(r => r.json())
       .then(d => setHaiPapers(d?.papers || []))
       .catch(() => {})

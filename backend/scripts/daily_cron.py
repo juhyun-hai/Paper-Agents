@@ -249,13 +249,15 @@ async def save_papers(conn, papers):
         try:
             await conn.execute("""
                 INSERT INTO papers (arxiv_id, title, abstract, authors, categories,
-                                    published_date, pdf_url, html_url, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+                                    published_date, pdf_url, html_url,
+                                    is_hai, hai_score, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
             """,
                 p['arxiv_id'], p['title'], p['abstract'],
                 json.dumps(p.get('authors', [])), json.dumps(p.get('categories', [])),
                 datetime.strptime(p['published_date'], '%Y-%m-%d') if p.get('published_date') else datetime.now(),
                 p.get('pdf_url', ''), p.get('arxiv_url', ''),
+                bool(p.get('is_hai', False)), float(p.get('hai_score', 0) or 0),
             )
             saved += 1
         except Exception as e:
@@ -608,6 +610,9 @@ async def main():
             'published_date': today_str,
             'pdf_url': f'https://arxiv.org/pdf/{aid}.pdf',
             'arxiv_url': f'https://arxiv.org/abs/{aid}',
+            # HAI 매칭 결과를 papers에도 반영 (HAI Picks가 최신 논문 보이게)
+            'is_hai': data.get('is_hai', False),
+            'hai_score': data.get('hai_score', 0),
         })
     new_count = await save_papers(conn, to_save)
 

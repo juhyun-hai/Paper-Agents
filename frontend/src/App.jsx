@@ -7,7 +7,6 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Paper from './pages/Paper';
 import HaiPapers from './pages/HaiPapers';
-import Ask from './pages/Ask';
 import TagPage from './pages/TagPage';
 import Bookmarks from './pages/Bookmarks';
 import Alerts from './pages/Alerts';
@@ -27,7 +26,6 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/paper/:arxiv_id" element={<Paper />} />
             <Route path="/hai" element={<HaiPapers />} />
-            <Route path="/ask" element={<Ask />} />
             <Route path="/tag/:tagname" element={<TagPage />} />
             <Route path="/tags/:tagname" element={<TagPage />} />
             <Route path="/bookmarks" element={<Bookmarks />} />
