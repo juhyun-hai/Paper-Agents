@@ -421,6 +421,18 @@ async def save_trending(conn, all_source_papers, featured_top_n=25,
                                               hai_score, upvotes)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(),
                         $9, $10, $11, $12, $13)
+                ON CONFLICT (arxiv_id, date) DO UPDATE SET
+                    title = EXCLUDED.title,
+                    sources = EXCLUDED.sources,
+                    trending_score = EXCLUDED.trending_score,
+                    final_score = EXCLUDED.final_score,
+                    rank = EXCLUDED.rank,
+                    multi_source_bonus = EXCLUDED.multi_source_bonus,
+                    featured_score = EXCLUDED.featured_score,
+                    is_featured = EXCLUDED.is_featured,
+                    is_hai = EXCLUDED.is_hai,
+                    hai_score = EXCLUDED.hai_score,
+                    upvotes = EXCLUDED.upvotes
             """,
                 aid, data['title'], json.dumps(data['sources']),
                 data['total_score'], data['total_score'], rank,
@@ -649,6 +661,7 @@ async def main():
                         featured_score, is_featured, upvotes
                     ) VALUES ($1, $2, $3, $4, $5, $6, 1.0, $7, NOW(),
                               $8, FALSE, 0)
+                    ON CONFLICT (arxiv_id, date) DO NOTHING
                 """, aid, title, json.dumps(['semantic_bridge']),
                      sim * 10, sim * 10, 100 + bridge_added, today, sim * 10)
                 bridge_added += 1

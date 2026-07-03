@@ -16,6 +16,14 @@ export HF_HOME=/home/juhyun/agent/paper-agent-github/backend/hf_cache
 #      • Citation refresh for papers from the last 30 days
 #      • OpenReview sweep only on Mondays (weekday == 0)
 $PY -u scripts/daily_cron.py
+CRON_EXIT=$?
+if [ $CRON_EXIT -ne 0 ]; then
+  # 03시 수집 실패 — 이메일(healthchecks)과 별개로 ntfy 즉시 push.
+  NTFY_TOPIC=$(grep '^NTFY_TOPIC=' /home/juhyun/agent/paper-agent-github/.env 2>/dev/null | cut -d= -f2)
+  [ -n "$NTFY_TOPIC" ] && curl -s -m 10 -H "Title: HotPaper 03시 수집 FAIL" -H "Priority: high" \
+    -d "daily_cron.py exit=$CRON_EXIT — logs/hotpaper_daily.log 확인" \
+    "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || true
+fi
 
 # 2. Backfill any missing figures (new papers + leftovers from previous days)
 #    Caps at 50 per run so we never block the cron for too long.

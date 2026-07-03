@@ -213,16 +213,16 @@ async def ask(
         stmt = stmt.where(Paper.year >= this_year - 1)
 
     # 정렬:
-    #  - recent → 최신순 우선
+    #  - recent → 기간은 위의 WHERE(year >= 작년)로 이미 좁혔으므로
+    #    정렬은 유사도가 맡는다. 날짜 DESC를 먼저 두면 유사도가 무시되어
+    #    무관한 최신 논문으로 오답을 생성한다 (실측: 'VLA 트렌드' 질문에
+    #    sim 0.5짜리 OOD 논문 1편만 근거로 답변).
     #  - 명시 토픽 chip(fault-diagnosis 등) → lab 우선 (hai_topic 분류가
     #    abstract 기반이라 lab 논문이 더 신뢰 가능)
     #  - 기본 → 유사도
     if intent['recent']:
-        stmt = stmt.order_by(
-            Paper.year.desc().nullslast(),
-            Paper.published_date.desc().nullslast(),
-            sim_expr.desc(),
-        )
+        stmt = stmt.where(sim_expr >= 0.55)  # 무관 논문 컷 (트렌드 오답 방지)
+        stmt = stmt.order_by(sim_expr.desc())
     elif topic and topic != "lab":
         stmt = stmt.order_by(
             Paper.is_lab_publication.desc(),
@@ -242,7 +242,7 @@ async def ask(
         elif intent['industrial']:
             relax = relax.where(Paper.is_hai.is_(True))
         rows = await session.execute(
-            relax.order_by(Paper.year.desc().nullslast(), sim_expr.desc()).limit(k)
+            relax.order_by(sim_expr.desc()).limit(k)
         )
         papers = rows.all()
 
