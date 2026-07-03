@@ -4,6 +4,7 @@
 계정 없이도 매일 자동 업데이트 받음.
 """
 from datetime import datetime, timezone, timedelta, date as _date
+from typing import Optional
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, Query
@@ -97,6 +98,104 @@ async def get_rss_feed(
         media_type="application/rss+xml; charset=utf-8",
         headers={"Cache-Control": "public, max-age=600"},
     )
+
+
+def _extract_one_liner(summary_text: str) -> str:
+    """'## 한 줄 요약' 헤더 다음의 첫 비어있지 않은 줄."""
+    if not summary_text:
+        return ""
+    lines = summary_text.splitlines()
+    for i, line in enumerate(lines):
+        if '한 줄 요약' in line:
+            for nxt in lines[i + 1:]:
+                t = nxt.strip().lstrip('-').strip()
+                if t and not t.startswith('#'):
+                    return t.replace('**', '')
+            break
+    return ""
+
+
+@router.get("/daily")
+async def get_daily_feed(
+    date: Optional[str] = Query(None, description="YYYY-MM-DD (없으면 최신 featured 날짜)"),
+    limit: int = Query(25, ge=1, le=50),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """홈 daily feed — 랭크된 featured + 한국어 one-liner + tags + 딥 요약 badge.
+
+    HF Daily Papers 스타일 렌더링에 필요한 모든 것을 한 번에.
+    """
+    # 날짜 네비게이션용: featured 있는 최근 14일
+    dates = (await session.execute(text("""
+        SELECT DISTINCT date FROM trending_papers
+        WHERE is_featured = TRUE
+        ORDER BY date DESC LIMIT 14
+    """))).scalars().all()
+    available = [d.isoformat() for d in dates]
+    if not available:
+        return {"date": None, "available_dates": [], "papers": []}
+
+    target = date if date in available else available[0]
+    target_date = _date.fromisoformat(target)
+
+    rows = (await session.execute(text("""
+        SELECT tp.arxiv_id, tp.rank, tp.upvotes, tp.sources, tp.is_hai,
+               p.id AS paper_id, p.title, p.authors, p.published_date, p.venue,
+               s.summary_text, s.figure_count, s.generation_model
+        FROM trending_papers tp
+        JOIN papers p ON p.arxiv_id = tp.arxiv_id
+        LEFT JOIN paper_summaries s ON s.arxiv_id = tp.arxiv_id
+        WHERE tp.date = :d AND tp.is_featured = TRUE
+        ORDER BY tp.rank ASC, tp.id ASC
+        LIMIT :limit
+    """), {'d': target_date, 'limit': limit})).all()
+
+    # 논문별 top tags (concepts.paper_count 순 4개)
+    paper_ids = [r.paper_id for r in rows]
+    tags_by_paper: dict[int, list[str]] = {}
+    if paper_ids:
+        tag_rows = (await session.execute(text("""
+            SELECT pc.paper_id, c.name,
+                   ROW_NUMBER() OVER (PARTITION BY pc.paper_id ORDER BY c.paper_count DESC) AS rn
+            FROM paper_concepts pc
+            JOIN concepts c ON c.id = pc.concept_id
+            WHERE pc.paper_id = ANY(:ids) AND c.type = 'keyword'
+        """), {'ids': paper_ids})).all()
+        for tr in tag_rows:
+            if tr.rn <= 4:
+                tags_by_paper.setdefault(tr.paper_id, []).append(tr.name)
+
+    import json as _json
+    seen = set()
+    papers = []
+    for r in rows:
+        if r.arxiv_id in seen:
+            continue
+        seen.add(r.arxiv_id)
+        gm = r.generation_model or ""
+        srcs = r.sources
+        if isinstance(srcs, str):
+            try:
+                srcs = _json.loads(srcs)
+            except Exception:
+                srcs = []
+        papers.append({
+            "arxiv_id": r.arxiv_id,
+            "rank": r.rank,
+            "title": r.title,
+            "authors": (r.authors or [])[:3],
+            "one_liner": _extract_one_liner(r.summary_text or ""),
+            "has_summary": bool(r.summary_text),
+            "deep": '+ar5iv' in gm,
+            "unverified": '+unverified' in gm,
+            "figure_count": r.figure_count or 0,
+            "tags": tags_by_paper.get(r.paper_id, []),
+            "upvotes": r.upvotes or 0,
+            "sources": srcs or [],
+            "is_hai": bool(r.is_hai),
+            "venue": r.venue,
+        })
+    return {"date": target, "available_dates": available, "papers": papers}
 
 
 @router.get("/today.json")

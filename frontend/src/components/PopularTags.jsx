@@ -30,36 +30,34 @@ export default function PopularTags({ limit = 40, minCount = 2 }) {
   const maxCount = Math.max(...tags.map(t => t.count))
 
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xl">🏷</span>
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Popular Tags</h2>
-        <span className="text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium">
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="font-bold text-gray-900 dark:text-white">🏷 인기 키워드</h2>
+        <span className="text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-1.5 py-0.5 rounded-full font-medium">
           자동 추출
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          수집된 논문에서 LLM이 자동으로 분류한 키워드
-        </span>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {tags.map(t => {
-          // size mapping: 작은 것 11px, 큰 것 16px
+          // size mapping: 작은 것 11px, 큰 것 15px (paper_count 비례)
           const ratio = t.count / maxCount
-          const fontSize = 11 + Math.round(ratio * 5)
-          const intensity = Math.round(50 + ratio * 50)  // bg-indigo-50 ~ -100
+          const fontSize = 11 + Math.round(ratio * 4)
+          // Tailwind JIT는 동적 클래스명을 추출 못 하므로 정적 매핑 사용
+          const strong = ratio > 0.5
+          const cls = strong
+            ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-100'
+            : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300'
           return (
             <Link
               key={t.name}
               to={`/tag/${encodeURIComponent(t.name)}`}
               style={{ fontSize: `${fontSize}px` }}
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full border transition-colors
-                bg-indigo-${intensity > 75 ? '100' : '50'} dark:bg-indigo-900/${intensity > 75 ? '40' : '20'}
-                text-indigo-${intensity > 75 ? '800' : '700'} dark:text-indigo-${intensity > 75 ? '100' : '200'}
-                border-indigo-200 dark:border-indigo-800
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border transition-colors
+                ${cls} border-indigo-200 dark:border-indigo-800
                 hover:bg-indigo-200 dark:hover:bg-indigo-900/60`}
             >
               <span className="font-medium">{t.name}</span>
-              <span className="text-[10px] opacity-70">{t.count}</span>
+              <span className="text-[10px] opacity-60">{t.count}</span>
             </Link>
           )
         })}
