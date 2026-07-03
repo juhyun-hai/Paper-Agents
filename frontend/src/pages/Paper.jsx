@@ -17,7 +17,9 @@ export default function Paper() {
   const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('abstract')
+  // 사이트 핵심 가치가 한국어 딥 요약이므로 요약 탭이 기본.
+  // (abstract는 영어 원문 — 원할 때만 탭 전환)
+  const [activeTab, setActiveTab] = useState('summary')
 
   useEffect(() => {
     setLoading(true)
@@ -77,8 +79,8 @@ export default function Paper() {
   const displayAuthors = authors.join(', ')
 
   const tabs = [
-    { id: 'abstract', label: '📄 Abstract', icon: '📄' },
     { id: 'summary', label: '🤖 AI 요약', icon: '🤖' },
+    { id: 'abstract', label: '📄 Abstract', icon: '📄' },
     { id: 'related', label: '🔗 Related Papers', icon: '🔗' },
   ]
 
@@ -141,18 +143,11 @@ export default function Paper() {
               📚 arXiv
             </a>
           )}
-          {pdf_url && (
-            <a href={pdf_url} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition">
-              📄 PDF
-            </a>
-          )}
           <a
-            href={`https://arxiv.org/pdf/${arxiv_id}.pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition">
-            📋 Download PDF
+            href={pdf_url || `https://arxiv.org/pdf/${arxiv_id}.pdf`}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition">
+            📄 PDF
           </a>
         </div>
       </div>

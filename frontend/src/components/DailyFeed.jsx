@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { API_BASE } from '../api/client'
 
 /**
  * HF Daily Papers 스타일 daily feed.
- * - 날짜 네비게이션 (← 이전 / 다음 →)
+ * - 날짜 네비게이션 (← 이전 / 다음 →) — ?date= URL param으로 관리해
+ *   논문 상세 갔다 뒤로 와도 보던 날짜가 유지된다.
  * - 랭크된 featured 리스트: 제목 + 한국어 one-liner + tags + meta badges
  */
 export default function DailyFeed() {
   const [data, setData] = useState(null)
-  const [date, setDate] = useState(null) // null = 최신
+  const [searchParams, setSearchParams] = useSearchParams()
+  const date = searchParams.get('date') // null = 최신
+  const setDate = (d) => setSearchParams(d ? { date: d } : {}, { replace: false })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,6 +23,16 @@ export default function DailyFeed() {
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [date])
+
+  // 뒤로가기로 돌아왔을 때 보던 위치 복원
+  useEffect(() => {
+    if (loading || !data) return
+    const saved = sessionStorage.getItem('feed_scroll')
+    if (saved) {
+      window.scrollTo(0, parseInt(saved, 10))
+      sessionStorage.removeItem('feed_scroll')
+    }
+  }, [loading, data])
 
   if (loading && !data) {
     return (
@@ -79,6 +92,7 @@ export default function DailyFeed() {
           <li key={p.arxiv_id}>
             <Link
               to={`/paper/${p.arxiv_id}`}
+              onClick={() => sessionStorage.setItem('feed_scroll', String(window.scrollY))}
               className="group block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3.5 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
             >
               <div className="flex gap-3.5">

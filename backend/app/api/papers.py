@@ -111,6 +111,28 @@ async def search_papers(
         total_result = await session.execute(count_query)
         total = total_result.scalar() or 0
 
+        # ── Hybrid(시맨틱) fallback/보강 ─────────────────────────────
+        # ILIKE 부분문자열 매칭은 한국어 쿼리에서 0건, 짧은 약어(LoRA)에서
+        # 오매칭이 잦다. relevance 정렬 + 첫 페이지일 때 BGE-m3 hybrid
+        # (시맨틱 0.7 + tsquery 0.3)로 교체/보강한다.
+        # 날짜/카테고리 필터가 걸린 경우는 기존 결과 유지 (hybrid 쿼리가
+        # 필터를 지원하지 않아 의미가 뒤틀리는 것 방지).
+        use_hybrid = (
+            q.strip() and sort == "relevance" and offset == 0
+            and not category and not date_from and not date_to
+        )
+        if use_hybrid:
+            try:
+                from ..services.embedding_service import get_embedding_service
+                svc = get_embedding_service()
+                hybrid = await svc.search_papers_hybrid(session, q.strip(), limit=limit)
+                if hybrid:
+                    papers = [p for p, _score in hybrid]
+                    total = max(total, len(papers))
+            except Exception as e:
+                # 임베딩 서비스 실패 시 ILIKE 결과 그대로 (graceful degrade)
+                print(f"⚠️ hybrid search fallback to ILIKE: {e}")
+
         # Convert to response format
         paper_responses = []
         for paper in papers:

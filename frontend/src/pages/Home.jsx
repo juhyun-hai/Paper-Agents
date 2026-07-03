@@ -24,24 +24,41 @@ export default function Home() {
 
   return (
     <main>
-      {/* Compact header */}
-      <section className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-        <div className="max-w-6xl mx-auto px-4 py-8 sm:py-10">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                오늘의 AI 논문
-              </h1>
-              <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
-                매일 새벽 자동 큐레이션 Top 25 · 본문 기반 한국어 딥 요약 · 무광고
-                {stats?.total_papers && (
-                  <span className="ml-2 text-gray-400">— 누적 {stats.total_papers.toLocaleString()}편</span>
-                )}
-              </p>
-            </div>
-            <div className="w-full sm:w-80">
-              <SearchBar />
-            </div>
+      {/* Hero — 기존의 예쁜 gradient 유지, 높이만 압축해서 feed가 바로 보이게 */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 text-white">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-300 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+
+        <div className="relative max-w-5xl mx-auto px-4 py-12 sm:py-16 text-center space-y-6">
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm font-medium">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            Curated by{' '}
+            <a href="https://hai.snu.ac.kr/" target="_blank" rel="noopener noreferrer"
+              className="font-semibold text-yellow-200 hover:text-yellow-100 transition-colors">
+              SNU HAI Lab
+            </a>
+            {stats?.total_papers && (
+              <>
+                <span className="text-blue-200">·</span>
+                <span className="text-blue-100">{stats.total_papers.toLocaleString()}편 수집</span>
+              </>
+            )}
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight">
+            Discover What's
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-orange-400"> Hot </span>
+            in AI Research
+          </h1>
+
+          <p className="text-base sm:text-lg text-blue-100 max-w-2xl mx-auto">
+            매일 <span className="font-semibold text-yellow-200">Top 25</span>편 자동 큐레이션 · 본문 기반 한국어 딥 요약 · 무광고
+          </p>
+
+          <div className="max-w-2xl mx-auto">
+            <SearchBar large />
           </div>
         </div>
       </section>

@@ -117,6 +117,7 @@ def _extract_one_liner(summary_text: str) -> str:
 
 @router.get("/daily")
 async def get_daily_feed(
+    response: Response,
     date: Optional[str] = Query(None, description="YYYY-MM-DD (없으면 최신 featured 날짜)"),
     limit: int = Query(25, ge=1, le=50),
     session: AsyncSession = Depends(get_async_session),
@@ -195,6 +196,8 @@ async def get_daily_feed(
             "is_hai": bool(r.is_hai),
             "venue": r.venue,
         })
+    # 하루 단위 데이터 — Cloudflare가 10분 캐시로 홈 트래픽 흡수
+    response.headers["Cache-Control"] = "public, max-age=600"
     return {"date": target, "available_dates": available, "papers": papers}
 
 

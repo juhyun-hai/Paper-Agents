@@ -1,5 +1,5 @@
 """Dynamic topic tag endpoints (P4)."""
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,10 +10,12 @@ router = APIRouter(prefix="/api/tags", tags=["Tags"])
 
 @router.get("/popular")
 async def get_popular_tags(
+    response: Response,
     limit: int = Query(40, ge=1, le=200),
     min_count: int = Query(2, ge=1, le=100),
     session: AsyncSession = Depends(get_async_session),
 ):
+    response.headers["Cache-Control"] = "public, max-age=1800"
     """인기 tag 목록 (paper_count desc). chip cloud용."""
     rows = (await session.execute(text("""
         SELECT name, paper_count
