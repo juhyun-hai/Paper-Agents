@@ -54,7 +54,7 @@ export default function Home() {
           </h1>
 
           <p className="text-base sm:text-lg text-blue-100 max-w-2xl mx-auto">
-            매일 <span className="font-semibold text-yellow-200">Top 25</span>편 자동 큐레이션 · 본문 기반 한국어 딥 요약 · 무광고
+            매일 <span className="font-semibold text-yellow-200">Top 25</span>편 자동 큐레이션 · 본문 기반 한국어 딥 요약
           </p>
 
           <div className="max-w-2xl mx-auto">
@@ -125,7 +125,7 @@ export default function Home() {
               <p>
                 <a href="https://hai.snu.ac.kr/" target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-700 dark:text-gray-300 hover:text-indigo-600">SNU HAI Lab</a>이
                 운영하는 논문 큐레이션. HuggingFace·arXiv·학회 데이터를 종합해 매일 25편을
-                선정하고 본문(ar5iv) 기반으로 한국어 요약을 생성합니다. 광고·스폰서 랭킹 없음.
+                선정하고 본문(ar5iv) 기반으로 한국어 요약을 생성합니다.
               </p>
               <p className="mt-1.5">
                 Developed by{' '}
