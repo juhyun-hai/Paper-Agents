@@ -150,6 +150,20 @@ async def get_summary(
                 "arxiv_id": arxiv_id
             }
 
+        # figures의 base64 data(편당 ~500KB)는 응답에서 제외 —
+        # 메타(캡션)만 보내고 이미지는 /figure/{n} 엔드포인트로 lazy load.
+        # (브라우저 이미지 캐시 + Cloudflare 캐시 활용)
+        fig_meta = []
+        for f in (summary.figures or []):
+            if isinstance(f, dict):
+                fig_meta.append({
+                    "id": f.get("id"),
+                    "number": f.get("number"),
+                    "caption": f.get("caption", ""),
+                    "page": f.get("page"),
+                    "image_url": f"/api/summary/{arxiv_id}/figure/{f.get('number', 0)}",
+                })
+
         return {
             "status": "found",
             "summary": {
@@ -158,7 +172,7 @@ async def get_summary(
                 "title": paper.title,
                 "authors": paper.authors or [],
                 "summary_text": summary.summary_text,
-                "figures": summary.figures or [],
+                "figures": fig_meta,
                 "summary_type": summary.summary_type,
                 "generated_at": summary.generated_at.isoformat(),
                 "word_count": summary.word_count,
@@ -279,6 +293,47 @@ async def get_recent_summaries(
             status_code=500,
             detail=f"Failed to get recent summaries: {str(e)}"
         )
+
+
+@router.get("/{arxiv_id}/figure/{number}")
+async def get_summary_figure(
+    arxiv_id: str,
+    number: int,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """개별 figure 이미지 — base64를 즉시 디코드해 PNG로 반환.
+
+    summary 응답에서 분리해 상세 페이지 로드를 513KB→수KB로 줄이고,
+    이미지는 브라우저/Cloudflare가 1일 캐시.
+    """
+    import base64
+    from fastapi.responses import Response as RawResponse
+
+    summary_result = await session.execute(
+        select(PaperSummary)
+        .where(PaperSummary.arxiv_id == arxiv_id)
+        .order_by(desc(PaperSummary.created_at))
+        .limit(1)
+    )
+    summary = summary_result.scalar_one_or_none()
+    if not summary or not summary.figures:
+        raise HTTPException(404, "no figures")
+
+    for f in summary.figures:
+        if isinstance(f, dict) and f.get("number") == number:
+            data = f.get("data", "")
+            if data.startswith("data:"):
+                data = data.split(",", 1)[-1]
+            try:
+                raw = base64.b64decode(data)
+            except Exception:
+                raise HTTPException(500, "figure decode failed")
+            return RawResponse(
+                content=raw,
+                media_type=f.get("mime", "image/png"),
+                headers={"Cache-Control": "public, max-age=86400, immutable"},
+            )
+    raise HTTPException(404, f"figure {number} not found")
 
 
 @router.delete("/{arxiv_id}")

@@ -160,6 +160,11 @@ async def fetch_arxiv_rss():
                 if any(p['arxiv_id'] == arxiv_id for p in papers):
                     continue
 
+                # RSS description은 'arXiv:XXXX Announce Type: new\nAbstract: ...'
+                # boilerplate가 붙음 — 임베딩/요약 노이즈라 제거.
+                desc = re.sub(r'^arXiv:[0-9v.]+ Announce Type: [a-z-]+\s*\n?Abstract:\s*',
+                              '', desc.strip())
+
                 papers.append({
                     'arxiv_id': arxiv_id,
                     'title': title.replace('\n', ' ').strip(),

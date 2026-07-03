@@ -151,12 +151,18 @@ const PaperSummary = ({ arxivId, paper }) => {
           </h3>
           <div className="space-y-6">
             {summary.figures.map((fig, i) => {
-              // Some legacy entries store the full data URI; new ones store raw base64.
-              const src = fig.data
-                ? (fig.data.startsWith('data:')
-                    ? fig.data
-                    : `data:${fig.mime || 'image/png'};base64,${fig.data}`)
-                : null;
+              // 신규: image_url (lazy-load 엔드포인트, 브라우저/CDN 캐시).
+              // 레거시: base64 data 인라인 (전체 data URI 또는 raw base64).
+              // image_url은 '/api/...' 상대경로 — API_BASE가 절대 URL이면 그 origin으로.
+              const src = fig.image_url
+                ? (API_BASE.startsWith('http')
+                    ? new URL(fig.image_url, API_BASE).href
+                    : fig.image_url)
+                : fig.data
+                  ? (fig.data.startsWith('data:')
+                      ? fig.data
+                      : `data:${fig.mime || 'image/png'};base64,${fig.data}`)
+                  : null;
               return (
                 <figure
                   key={fig.id || i}
