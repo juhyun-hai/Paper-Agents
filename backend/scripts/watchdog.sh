@@ -8,6 +8,11 @@
 #  - Cloudflared tunnel (systemd)
 
 set -u
+# cron 환경엔 XDG_RUNTIME_DIR가 없어 systemctl --user가 전부 실패한다
+# (→ tunnel down 오판 + 재시작 명령 무효). 명시 설정 필수.
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
+
 ENV_FILE=/home/juhyun/agent/paper-agent-github/.env
 NTFY_TOPIC=$(grep '^NTFY_TOPIC=' "$ENV_FILE" 2>/dev/null | cut -d= -f2)
 
