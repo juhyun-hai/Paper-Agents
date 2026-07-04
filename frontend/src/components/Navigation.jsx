@@ -10,6 +10,7 @@ const Navigation = ({ onOpenAgent }) => {
     { path: '/',         label: 'Home',     icon: '🏠', description: 'Hot Paper homepage' },
     { path: '/search',   label: 'Search',   icon: '🔍', description: 'Search and browse papers' },
     { path: '/trending', label: 'Trending', icon: '🔥', description: 'Discover hottest papers' },
+    { path: '/explore',  label: 'Map',      icon: '🕸', description: '논문 유사도 지도 (interactive)' },
     { path: '/hai',      label: 'HAI Picks', icon: '🎓', description: 'HAI Lab featured papers' },
   ];
   // 우측 user tools — icon only, 호버 시 label.

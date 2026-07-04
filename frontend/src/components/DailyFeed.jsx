@@ -106,48 +106,33 @@ export default function DailyFeed() {
                   )}
                 </div>
 
-                {/* Body */}
+                {/* Body — 밀도 낮게: 제목 + 한 줄 요약 1줄 + 핵심 badge만 */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900 dark:text-white leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                     {p.title}
                   </h3>
 
                   {p.one_liner && (
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2">
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-1">
                       {p.one_liner}
                     </p>
                   )}
 
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <div className="mt-2 flex items-center gap-2 text-[11px] overflow-hidden">
                     {p.deep && (
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium" title="본문 기반 딥 요약">
-                        🧠 딥 요약
+                      <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium" title="본문 기반 딥 요약">
+                        🧠 요약
                       </span>
-                    )}
-                    {!p.has_summary && (
-                      <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500" title="요약 생성 대기 중">
-                        ⏳ 요약 예정
-                      </span>
-                    )}
-                    {p.figure_count > 0 && (
-                      <span className="text-gray-500 dark:text-gray-400">📊 그림 {p.figure_count}</span>
                     )}
                     {p.is_hai && (
-                      <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">🎓 HAI</span>
+                      <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">🎓</span>
                     )}
-                    {p.tags.slice(0, 4).map(t => (
-                      <span
-                        key={t}
-                        className="px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/25 text-indigo-600 dark:text-indigo-300"
-                      >
+                    {p.tags.slice(0, 3).map(t => (
+                      <span key={t}
+                        className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
                         {t}
                       </span>
                     ))}
-                    {p.authors.length > 0 && (
-                      <span className="text-gray-400 dark:text-gray-500 truncate">
-                        · {p.authors.join(', ')}{p.authors.length >= 3 ? ' 외' : ''}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>

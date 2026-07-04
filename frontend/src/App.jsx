@@ -8,6 +8,7 @@ import Search from './pages/Search';
 import Paper from './pages/Paper';
 import HaiPapers from './pages/HaiPapers';
 import TagPage from './pages/TagPage';
+import Explore from './pages/Explore';
 import Bookmarks from './pages/Bookmarks';
 import Alerts from './pages/Alerts';
 import './App.css';
@@ -26,6 +27,7 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/paper/:arxiv_id" element={<Paper />} />
             <Route path="/hai" element={<HaiPapers />} />
+            <Route path="/explore" element={<Explore />} />
             <Route path="/tag/:tagname" element={<TagPage />} />
             <Route path="/tags/:tagname" element={<TagPage />} />
             <Route path="/bookmarks" element={<Bookmarks />} />

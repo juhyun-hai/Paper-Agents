@@ -28,6 +28,7 @@ from .api.agent import router as agent_router
 from .api.tags import router as tags_router
 from .api.feed import router as feed_router
 from .api.saved_searches import router as saved_searches_router
+from .api.explore import router as explore_router
 
 # Plugin gates (fork-friendly isolation; see docs/PLUGIN_HAI.md).
 # Default ON to preserve current behavior on the canonical deployment.
@@ -206,6 +207,7 @@ app.include_router(agent_router)
 app.include_router(tags_router)
 app.include_router(feed_router)
 app.include_router(saved_searches_router)
+app.include_router(explore_router)
 
 
 # Root endpoints

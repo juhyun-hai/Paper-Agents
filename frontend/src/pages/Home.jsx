@@ -106,8 +106,11 @@ export default function Home() {
 
             {/* Subscribe */}
             <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/30 border border-indigo-100 dark:border-indigo-900 rounded-xl p-5">
-              <h2 className="font-bold text-gray-900 dark:text-white mb-2">매일 받아보기</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white mb-2">더 깊이 탐색</h2>
               <div className="space-y-2 text-sm">
+                <Link to="/explore" className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                  <span>🕸</span> 논문 지도 (interactive map)
+                </Link>
                 <Link to="/alerts" className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
                   <span>🔔</span> 관심 키워드 알림 등록
                 </Link>
