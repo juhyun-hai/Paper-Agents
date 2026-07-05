@@ -55,19 +55,26 @@ async def get_paper_tags(
 async def papers_by_tag(
     tag: str = Query(..., description="tag name (canonical, lowercase)"),
     limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    sort: str = Query("recent", pattern="^(recent|citations)$"),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """특정 tag 가진 paper 리스트 (최신순). tag filter용."""
-    rows = (await session.execute(text("""
+    """특정 tag 가진 paper 리스트. offset 페이지네이션 + 정렬 지원."""
+    order = ("p.citation_count DESC NULLS LAST, p.published_date DESC NULLS LAST"
+             if sort == "citations"
+             else "p.published_date DESC NULLS LAST")
+    rows = (await session.execute(text(f"""
         SELECT p.arxiv_id, p.title, p.authors, p.abstract,
-               p.published_date, p.pdf_url, p.html_url
+               p.published_date, p.pdf_url, p.html_url,
+               COUNT(*) OVER() AS total_count
         FROM paper_concepts pc
         JOIN concepts c ON c.id = pc.concept_id
         JOIN papers p ON p.id = pc.paper_id
         WHERE c.type = 'keyword' AND lower(c.name) = lower(:tag)
-        ORDER BY p.published_date DESC NULLS LAST
-        LIMIT :limit
-    """), {'tag': tag.strip().lower(), 'limit': limit})).all()
+        ORDER BY {order}
+        LIMIT :limit OFFSET :offset
+    """), {'tag': tag.strip().lower(), 'limit': limit, 'offset': offset})).all()
+    total = rows[0].total_count if rows else 0
     return {
         "tag": tag,
         "papers": [
@@ -82,5 +89,7 @@ async def papers_by_tag(
             }
             for r in rows
         ],
-        "total": len(rows),
+        "total": total,
+        "offset": offset,
+        "has_more": offset + len(rows) < total,
     }

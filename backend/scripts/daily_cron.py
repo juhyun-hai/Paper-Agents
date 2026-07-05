@@ -413,10 +413,25 @@ async def save_trending(conn, all_source_papers, featured_top_n=25,
         reverse=True,
     )
 
+    # 최근 7일 안에 이미 featured였던 논문은 오늘 featured에서 제외 —
+    # HF Daily가 같은 논문을 며칠씩 올려 '오늘의 논문'이 40%까지 재탕되는
+    # 문제 방지. trending 기록 자체는 남김 (cross-day 인기 추적용).
+    prev_featured = {
+        r['arxiv_id'] for r in await conn.fetch("""
+            SELECT DISTINCT arxiv_id FROM trending_papers
+            WHERE is_featured = TRUE
+              AND date >= CURRENT_DATE - 7 AND date < CURRENT_DATE
+        """)
+    }
+
     saved = 0
     featured_ids = set()
+    skipped_rerun = 0
     for rank, (aid, data) in enumerate(ranked[:100], 1):
-        is_featured = rank <= featured_top_n
+        is_new = aid not in prev_featured
+        is_featured = is_new and len(featured_ids) < featured_top_n
+        if not is_new and rank <= featured_top_n:
+            skipped_rerun += 1
         if is_featured:
             featured_ids.add(aid)
         try:
@@ -457,7 +472,7 @@ async def save_trending(conn, all_source_papers, featured_top_n=25,
         for s in data['sources']:
             source_counts[s] += 1
 
-    print(f'🔥 Trending 저장: {saved}개 (featured: {len(featured_ids)})')
+    print(f'🔥 Trending 저장: {saved}개 (featured: {len(featured_ids)}, 재탕 제외: {skipped_rerun})')
     print(f'   소스별: {dict(source_counts)}')
     multi = sum(1 for d in paper_scores.values() if len(d['sources']) >= 2)
     print(f'   크로스 플랫폼: {multi}개 논문')
