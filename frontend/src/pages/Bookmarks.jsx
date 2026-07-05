@@ -4,6 +4,32 @@ import PaperCard from '../components/PaperCard.jsx'
 import { getBookmarks, clearBookmarks } from '../utils/bookmarks'
 import { getPaper } from '../api/client'
 
+// arXiv id → BibTeX (클라이언트 생성 — 서버 불필요)
+function toBibtex(papers) {
+  return papers.map(p => {
+    const year = (p.date || p.published_date || '').slice(0, 4) || 'XXXX'
+    const first = ((p.authors || [])[0] || 'unknown').split(' ').pop()
+    const key = `${first}${year}${p.arxiv_id.replace('.', '')}`
+    const authors = (p.authors || []).join(' and ')
+    return `@misc{${key},
+  title={${p.title}},
+  author={${authors}},
+  year={${year}},
+  eprint={${p.arxiv_id}},
+  archivePrefix={arXiv},
+  url={https://arxiv.org/abs/${p.arxiv_id}}
+}`
+  }).join('\n\n')
+}
+
+function download(filename, text, mime = 'text/plain') {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }))
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 export default function Bookmarks() {
   const [papers, setPapers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -30,12 +56,29 @@ export default function Bookmarks() {
           </p>
         </div>
         {papers.length > 0 && (
-          <button
-            onClick={() => { if (confirm('모두 삭제할까?')) { clearBookmarks(); setPapers([]) } }}
-            className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-          >
-            모두 지우기
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => download('hotpaper-bookmarks.bib', toBibtex(papers))}
+              title="논문 작성용 BibTeX로 내보내기"
+              className="text-xs px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900/20 font-medium"
+            >
+              📚 BibTeX
+            </button>
+            <button
+              onClick={() => download('hotpaper-bookmarks.json',
+                JSON.stringify(papers.map(p => p.arxiv_id), null, 2), 'application/json')}
+              title="백업/다른 브라우저 이동용 JSON"
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              💾 JSON
+            </button>
+            <button
+              onClick={() => { if (confirm('모두 삭제할까?')) { clearBookmarks(); setPapers([]) } }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              모두 지우기
+            </button>
+          </div>
         )}
       </div>
 

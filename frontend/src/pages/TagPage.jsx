@@ -19,9 +19,23 @@ export default function TagPage() {
 
   const [papers, setPapers] = useState([])
   const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [sort, setSort] = useState('recent')       // recent | citations
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [related, setRelated] = useState([])
+
+  const PAGE = 30
+
+  const mapPapers = (list) => (list || []).map(p => ({
+    ...p,
+    date: p.published_date || p.date || '',
+  }))
+
+  const fetchPage = (offset) =>
+    fetch(`${API_BASE}/tags/papers?tag=${encodeURIComponent(decoded)}&limit=${PAGE}&offset=${offset}&sort=${sort}`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
 
   useEffect(() => {
     let cancelled = false
@@ -30,21 +44,12 @@ export default function TagPage() {
     setPapers([])
     setTotal(0)
 
-    fetch(`${API_BASE}/tags/papers?tag=${encodeURIComponent(decoded)}&limit=50`)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
+    fetchPage(0)
       .then(d => {
         if (cancelled) return
-        // /api/tags/papers 는 published_date / pdf_url / html_url 키를 쓰지만
-        // PaperCard 는 date 키를 기대 → 매핑해서 넘김
-        const mapped = (d?.papers || []).map(p => ({
-          ...p,
-          date: p.published_date || p.date || '',
-        }))
-        setPapers(mapped)
-        setTotal(d?.total || mapped.length)
+        setPapers(mapPapers(d?.papers))
+        setTotal(d?.total || 0)
+        setHasMore(!!d?.has_more)
         setLoading(false)
       })
       .catch(e => {
@@ -66,7 +71,7 @@ export default function TagPage() {
       .catch(() => {})
 
     return () => { cancelled = true }
-  }, [decoded])
+  }, [decoded, sort])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -92,10 +97,24 @@ export default function TagPage() {
           </span>
         </div>
 
-        <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-          LLM이 수집된 논문의 제목과 초록에서 추출한 동적 토픽 태그입니다.
-          최근 발행일 순으로 정렬됩니다.
-        </p>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            LLM이 수집된 논문의 제목과 초록에서 추출한 동적 토픽 태그입니다.
+          </p>
+          {/* 정렬 토글 */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {[['recent', '최신순'], ['citations', '인용순']].map(([v, lab]) => (
+              <button key={v} onClick={() => setSort(v)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  sort === v
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}>
+                {lab}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Body */}
@@ -133,6 +152,25 @@ export default function TagPage() {
           {papers.map(p => (
             <PaperCard key={p.arxiv_id} paper={p} />
           ))}
+          {hasMore && (
+            <div className="md:col-span-2 text-center pt-2">
+              <button
+                onClick={() => {
+                  setLoadingMore(true)
+                  fetchPage(papers.length)
+                    .then(d => {
+                      setPapers(prev => [...prev, ...mapPapers(d?.papers)])
+                      setHasMore(!!d?.has_more)
+                    })
+                    .finally(() => setLoadingMore(false))
+                }}
+                disabled={loadingMore}
+                className="px-6 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+              >
+                {loadingMore ? '불러오는 중…' : `더 보기 (${papers.length}/${total})`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

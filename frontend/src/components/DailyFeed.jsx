@@ -102,7 +102,7 @@ export default function DailyFeed() {
                     {p.rank}
                   </span>
                   {p.upvotes > 0 && (
-                    <div className="text-[10px] text-gray-400 mt-0.5">▲{p.upvotes}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5" title="HuggingFace Daily Papers upvotes">HF▲{p.upvotes}</div>
                   )}
                 </div>
 

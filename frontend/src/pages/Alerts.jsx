@@ -10,6 +10,18 @@ export default function Alerts() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', tag: '', keyword: '' })
+  const [allTags, setAllTags] = useState([])       // 자동완성용
+  // 마지막 방문 시각 — 이후 발행된 논문에 NEW 뱃지
+  const [lastSeen] = useState(() => localStorage.getItem('alerts_last_seen') || '')
+  useEffect(() => {
+    localStorage.setItem('alerts_last_seen', new Date().toISOString().slice(0, 10))
+  }, [])
+  useEffect(() => {
+    fetch(`${API_BASE}/tags/popular?limit=200&min_count=2`)
+      .then(r => r.json())
+      .then(d => setAllTags((d.tags || []).map(t => t.name)))
+      .catch(() => {})
+  }, [])
 
   const refresh = () => {
     setLoading(true)
@@ -73,12 +85,22 @@ export default function Alerts() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
           />
-          <input
-            type="text" placeholder="tag (예: vision-language-action)"
-            value={form.tag}
-            onChange={(e) => setForm({ ...form, tag: e.target.value })}
-            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
-          />
+          <div>
+            <input
+              type="text" placeholder="tag (예: vision-language-action)"
+              value={form.tag} list="tag-options"
+              onChange={(e) => setForm({ ...form, tag: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
+            />
+            <datalist id="tag-options">
+              {allTags.map(t => <option key={t} value={t} />)}
+            </datalist>
+            {form.tag && allTags.length > 0 && !allTags.includes(form.tag.trim().toLowerCase()) && (
+              <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                ⚠ 등록된 tag 목록에 없어요 — 입력 중이면 무시, 오타면 자동완성에서 선택
+              </p>
+            )}
+          </div>
           <input
             type="text" placeholder="키워드 (free-text)"
             value={form.keyword}
@@ -122,15 +144,21 @@ export default function Alerts() {
               {matches[s.id] && <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-semibold">최근 60일 {matches[s.id].length}편</span>}
             </div>
             <ul className="space-y-2">
-              {(matches[s.id] || []).slice(0, 5).map(m => (
-                <li key={m.arxiv_id} className="text-sm">
-                  <Link to={`/paper/${m.arxiv_id}`}
-                    className="text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400">
-                    {m.title}
-                  </Link>
-                  <span className="text-xs text-gray-500 ml-2">({m.published_date || '?'})</span>
-                </li>
-              ))}
+              {(matches[s.id] || []).slice(0, 5).map(m => {
+                const isNew = lastSeen && m.published_date && m.published_date > lastSeen
+                return (
+                  <li key={m.arxiv_id} className="text-sm">
+                    {isNew && (
+                      <span className="mr-1.5 text-[10px] font-bold text-white bg-rose-500 px-1.5 py-0.5 rounded">NEW</span>
+                    )}
+                    <Link to={`/paper/${m.arxiv_id}`}
+                      className="text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400">
+                      {m.title}
+                    </Link>
+                    <span className="text-xs text-gray-500 ml-2">({m.published_date || '?'})</span>
+                  </li>
+                )
+              })}
             </ul>
             {matches[s.id] && matches[s.id].length > 5 && (
               <p className="text-xs text-gray-500 mt-2">… 외 {matches[s.id].length - 5}편</p>
