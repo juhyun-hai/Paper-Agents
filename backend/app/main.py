@@ -29,6 +29,8 @@ from .api.tags import router as tags_router
 from .api.feed import router as feed_router
 from .api.saved_searches import router as saved_searches_router
 from .api.explore import router as explore_router
+from .api.seo import router as seo_router
+from .api.trends import router as trends_router
 
 # Plugin gates (fork-friendly isolation; see docs/PLUGIN_HAI.md).
 # Default ON to preserve current behavior on the canonical deployment.
@@ -208,6 +210,8 @@ app.include_router(tags_router)
 app.include_router(feed_router)
 app.include_router(saved_searches_router)
 app.include_router(explore_router)
+app.include_router(seo_router)
+app.include_router(trends_router)
 
 
 # Root endpoints

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import SearchBar from '../components/SearchBar.jsx'
 import DailyFeed from '../components/DailyFeed.jsx'
 import PopularTags from '../components/PopularTags.jsx'
+import RisingKeywords from '../components/RisingKeywords.jsx'
 import { API_BASE, getStats } from '../api/client.js'
 
 /**
@@ -75,6 +76,11 @@ export default function Home() {
 
           {/* Sidebar (1/3) */}
           <aside className="space-y-6">
+            {/* Rising keywords */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+              <RisingKeywords />
+            </div>
+
             {/* Popular tags */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
               <PopularTags limit={24} minCount={3} />

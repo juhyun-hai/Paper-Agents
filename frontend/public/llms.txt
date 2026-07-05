@@ -1,0 +1,28 @@
+# HotPaper
+
+> HotPaper (https://hotpaper.ai) is a daily AI/ML research paper discovery service. It collects trending arXiv papers every day, ranks them by community signals, and publishes structured Korean-language summaries (7 sections: problem, method, results, limitations, etc.), topic tags, and trend analytics. Built and operated by the Hyperautonomy AI Lab at Seoul National University.
+
+All API endpoints below are public, return JSON unless noted, and require no authentication.
+
+## Agent-readable API endpoints
+
+- https://hotpaper.ai/api/feed/daily : Today's featured papers with one-line summaries, tags, and the list of available dates. Optional query param `date=YYYY-MM-DD`.
+- https://hotpaper.ai/api/feed/today.json : Machine-readable JSON feed of today's featured papers.
+- https://hotpaper.ai/api/tags/popular : Most popular topic tags with paper counts.
+- https://hotpaper.ai/api/search?q={query} : Full-text search over collected papers and summaries.
+- https://hotpaper.ai/api/seo/paper/{arxiv_id} : Server-rendered HTML page for a single paper (title, abstract, Korean summary) — readable without JavaScript.
+
+## Feeds
+
+- https://hotpaper.ai/rss.xml : RSS feed of daily featured papers with Korean summaries.
+- https://hotpaper.ai/sitemap.xml : Sitemap of all paper pages.
+
+## MCP server
+
+An MCP (Model Context Protocol) server is available for AI agents to query HotPaper directly:
+https://github.com/juhyun-hai/Paper-Agents/tree/master/mcp_server
+
+## Notes
+
+- Paper pages live at https://hotpaper.ai/paper/{arxiv_id} (e.g. https://hotpaper.ai/paper/2501.12345). Crawlers and AI agents receive a server-rendered HTML version automatically.
+- Source data: arXiv (cs.AI, cs.LG, cs.CL and related categories), updated daily around 04:00 KST.

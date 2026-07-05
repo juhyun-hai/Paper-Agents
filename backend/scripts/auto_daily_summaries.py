@@ -14,6 +14,7 @@ import asyncio
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import traceback
@@ -279,6 +280,28 @@ async def save_summary(conn, arxiv_id: str, summary_text: str, figures: list,
             json.dumps(figures), len(figures))
 
 
+def run_daily_overview():
+    """오늘의 연구 흐름 요약 생성 (generate_daily_overview.py subprocess).
+
+    실패해도 본 작업(요약 cron)을 절대 막지 않음 — try/except로 감싸고
+    exit code만 로그.
+    """
+    try:
+        script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'generate_daily_overview.py')
+        r = subprocess.run(
+            [sys.executable, script],
+            capture_output=True, text=True, timeout=600,
+        )
+        tail = (r.stdout or '').strip().splitlines()
+        if tail:
+            print(f"  overview: {tail[-1]}")
+        if r.returncode != 0:
+            print(f"  ⚠️ overview 생성 실패 (exit {r.returncode}): {(r.stderr or '')[-300:]}")
+    except Exception as e:
+        print(f"  ⚠️ overview 생성 실패: {e}")
+
+
 def heartbeat(state: str = "", payload: dict | None = None):
     """healthchecks.io 같은 dead-man-switch. URL 없으면 silently skip.
 
@@ -319,6 +342,7 @@ async def main():
         targets = await fetch_targets(conn)
         print(f"🎯 {len(targets)} featured papers without summary (lookback {LOOKBACK_DAYS}d)")
         if not targets:
+            run_daily_overview()  # 요약은 다 있어도 overview는 누락일 수 있음
             elapsed = time.time() - started
             heartbeat('', {
                 'processed': 0, 'failed': 0, 'lookback_days': LOOKBACK_DAYS,
@@ -376,6 +400,9 @@ async def main():
                 fail += 1
                 fail_ids.append(aid)
                 print(f"    ❌ db err: {e}")
+
+        # 오늘의 연구 흐름 요약 (실패해도 본 작업 안 막음)
+        run_daily_overview()
 
         elapsed = time.time() - started
         print(

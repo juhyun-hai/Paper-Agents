@@ -45,7 +45,7 @@ export default function DailyFeed() {
   }
   if (!data || !data.papers) return null
 
-  const { available_dates: dates = [], papers } = data
+  const { available_dates: dates = [], papers, overview } = data
   const cur = data.date
   const idx = dates.indexOf(cur)
   const newer = idx > 0 ? dates[idx - 1] : null
@@ -85,6 +85,29 @@ export default function DailyFeed() {
           </button>
         </div>
       </div>
+
+      {/* 오늘의 연구 흐름 요약 — overview 있을 때만 */}
+      {overview && overview.text && (
+        <div className="mb-5 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/30 px-4 py-3.5">
+          <div className="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+            <span>📡</span>
+            <span>오늘의 연구 흐름</span>
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+            {overview.text}
+          </p>
+          {overview.top_themes && overview.top_themes.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {overview.top_themes.map(t => (
+                <span key={t}
+                  className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Feed list */}
       <ol className="space-y-2.5">

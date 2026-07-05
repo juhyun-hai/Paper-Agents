@@ -139,6 +139,24 @@ async def get_daily_feed(
     target = date if date in available else available[0]
     target_date = _date.fromisoformat(target)
 
+    # 오늘의 연구 흐름 요약 (없으면 None — 실패해도 feed는 정상 반환)
+    overview = None
+    try:
+        ov = (await session.execute(text("""
+            SELECT overview_text, top_themes FROM daily_overviews WHERE date = :d
+        """), {'d': target_date})).first()
+        if ov:
+            themes = ov.top_themes
+            if isinstance(themes, str):
+                import json as _j
+                try:
+                    themes = _j.loads(themes)
+                except Exception:
+                    themes = []
+            overview = {"text": ov.overview_text, "top_themes": themes or []}
+    except Exception:
+        overview = None
+
     rows = (await session.execute(text("""
         SELECT tp.arxiv_id, tp.rank, tp.upvotes, tp.sources, tp.is_hai,
                p.id AS paper_id, p.title, p.authors, p.published_date, p.venue,
@@ -198,7 +216,7 @@ async def get_daily_feed(
         })
     # 하루 단위 데이터 — Cloudflare가 10분 캐시로 홈 트래픽 흡수
     response.headers["Cache-Control"] = "public, max-age=600"
-    return {"date": target, "available_dates": available, "papers": papers}
+    return {"date": target, "available_dates": available, "overview": overview, "papers": papers}
 
 
 @router.get("/today.json")

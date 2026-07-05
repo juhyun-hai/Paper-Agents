@@ -1,5 +1,45 @@
 {
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "cd frontend && npm install"
+  "installCommand": "cd frontend && npm install",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://api.hotpaper.ai/api/$1"
+    },
+    {
+      "source": "/paper/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|crawler|spider|Slurp|facebookexternalhit|Twitterbot|LinkedInBot|TelegramBot|WhatsApp|Discordbot|GPTBot|ClaudeBot|Claude-Web|PerplexityBot|Bytespider|Applebot).*"
+        }
+      ],
+      "destination": "https://api.hotpaper.ai/api/seo/paper/$1"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|crawler|spider|Slurp|facebookexternalhit|Twitterbot|LinkedInBot|TelegramBot|WhatsApp|Discordbot|GPTBot|ClaudeBot|Claude-Web|PerplexityBot|Bytespider|Applebot).*"
+        }
+      ],
+      "destination": "https://api.hotpaper.ai/api/seo/home"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://api.hotpaper.ai/api/seo/sitemap.xml"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "https://api.hotpaper.ai/api/feed/rss"
+    },
+    {
+      "source": "/((?!api|assets|sitemap|rss).*)",
+      "destination": "/index.html"
+    }
+  ]
 }
