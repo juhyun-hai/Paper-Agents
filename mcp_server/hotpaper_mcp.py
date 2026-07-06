@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HotPaper MCP server — Claude Desktop / Cursor 에서 hotpaper DB 검색.
+r"""HotPaper MCP server — Claude Desktop / Cursor 에서 hotpaper DB 검색.
 
 설치/실행:
   pip install mcp httpx
