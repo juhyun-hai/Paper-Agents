@@ -40,7 +40,8 @@ except ImportError:
     print("ERROR: 'mcp' package not installed. Run: pip install mcp", file=sys.stderr)
     sys.exit(1)
 
-BASE = os.environ.get("HOTPAPER_API", "https://hotpaper.ai/api").rstrip("/")
+# api.hotpaper.ai 직접 — hotpaper.ai/api는 정적 호스팅이 SPA를 반환할 수 있음
+BASE = os.environ.get("HOTPAPER_API", "https://api.hotpaper.ai/api").rstrip("/")
 TIMEOUT = 30.0
 
 

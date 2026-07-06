@@ -111,7 +111,7 @@ export default function DailyFeed() {
 
       {/* Feed list */}
       <ol className="space-y-2.5">
-        {papers.map(p => (
+        {papers.map((p, i) => (
           <li key={p.arxiv_id}>
             <Link
               to={`/paper/${p.arxiv_id}`}
@@ -121,8 +121,9 @@ export default function DailyFeed() {
               <div className="flex gap-3.5">
                 {/* Rank */}
                 <div className="flex-shrink-0 w-8 text-center">
-                  <span className={`text-lg font-bold ${p.rank <= 3 ? 'text-orange-500' : 'text-gray-300 dark:text-gray-600'}`}>
-                    {p.rank}
+                  {/* 표시 순위는 1..N — 백엔드 rank는 재탕 제외 전 원본이라 24부터 시작할 수 있음 */}
+                  <span className={`text-lg font-bold ${i < 3 ? 'text-orange-500' : 'text-gray-300 dark:text-gray-600'}`}>
+                    {i + 1}
                   </span>
                   {p.upvotes > 0 && (
                     <div className="text-[10px] text-gray-400 mt-0.5" title="HuggingFace Daily Papers upvotes">HF▲{p.upvotes}</div>
