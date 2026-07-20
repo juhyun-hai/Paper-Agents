@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hotpaper-companion"
+version = "0.1.0"
+description = "HotPaper.ai MCP companion — 개인 연구 프로필 기반 논문 브리핑 (Claude/Codex/Cursor 플러그인)"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0",
+    "httpx>=0.25",
+]
+
+[project.scripts]
+hotpaper-mcp = "hotpaper_mcp:cli_main"
+
+[tool.setuptools]
+py-modules = ["hotpaper_mcp"]

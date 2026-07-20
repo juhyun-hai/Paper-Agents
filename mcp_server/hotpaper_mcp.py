@@ -27,8 +27,11 @@ Windows `%APPDATA%\Claude\claude_desktop_config.json`):
 """
 from __future__ import annotations
 import asyncio
+import json
 import os
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
@@ -43,6 +46,23 @@ except ImportError:
 # api.hotpaper.ai 직접 — hotpaper.ai/api는 정적 호스팅이 SPA를 반환할 수 있음
 BASE = os.environ.get("HOTPAPER_API", "https://api.hotpaper.ai/api").rstrip("/")
 TIMEOUT = 30.0
+
+# 개인화 프로필 — 사용자 로컬에만 저장, 서버로 전송되지 않음.
+PROFILE_PATH = Path(os.environ.get(
+    "HOTPAPER_PROFILE", str(Path.home() / ".hotpaper" / "profile.json")))
+
+
+def _load_profile() -> dict | None:
+    try:
+        return json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _save_profile(profile: dict) -> None:
+    PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROFILE_PATH.write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 async def _get(path: str, params: dict | None = None) -> dict:
@@ -122,6 +142,84 @@ async def tool_tag_papers(tag: str, limit: int = 20) -> str:
     return f"### Tag '{tag}' ({len(papers)}편)\n\n{_format_papers(papers, limit)}"
 
 
+def tool_save_profile(topics: list, keywords: list, name: str = "",
+                       description: str = "") -> str:
+    """연구 프로필을 로컬(~/.hotpaper/profile.json)에 저장."""
+    profile = {
+        "name": name,
+        "topics": [str(t).strip() for t in topics if str(t).strip()],
+        "keywords": sorted({str(k).strip().lower() for k in keywords if str(k).strip()}),
+        "description": description,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _save_profile(profile)
+    return (f"✅ 프로필 저장됨 → {PROFILE_PATH}\n"
+            f"- topics: {', '.join(profile['topics'])}\n"
+            f"- keywords ({len(profile['keywords'])}): {', '.join(profile['keywords'][:15])}"
+            f"{' …' if len(profile['keywords']) > 15 else ''}\n"
+            f"(이 파일은 로컬에만 저장되며 서버로 전송되지 않습니다)")
+
+
+def tool_get_profile() -> str:
+    p = _load_profile()
+    if not p:
+        return ("(프로필 없음) hotpaper_save_profile로 만들 수 있어요.\n"
+                "예: 사용자의 연구 폴더/노트를 읽고 topics·keywords를 추출한 뒤 저장하세요.")
+    return json.dumps(p, ensure_ascii=False, indent=2)
+
+
+def _match_score(paper: dict, keywords: list[str]) -> tuple[int, list[str]]:
+    """프로필 keyword가 paper의 tags/제목/one-liner에 몇 개나 등장하는지."""
+    hay = " ".join([
+        paper.get("title", ""), paper.get("one_liner", ""),
+        " ".join(paper.get("tags", [])),
+    ]).lower()
+    hits = [kw for kw in keywords if kw and kw in hay]
+    return len(hits), hits
+
+
+async def tool_today_for_me() -> str:
+    """오늘 featured를 프로필과 매칭 — 관련 논문 상세 + 나머지는 제목만."""
+    profile = _load_profile()
+    if not profile:
+        return ("프로필이 없습니다. 먼저 사용자의 연구 폴더/논문/노트를 읽고 "
+                "hotpaper_save_profile(topics, keywords)로 프로필을 만들어 주세요.")
+    kws = profile.get("keywords", [])
+    data = await _get("/feed/daily", params={"limit": 25})
+    papers = data.get("papers", [])
+    ov = data.get("overview") or {}
+
+    scored = []
+    for p in papers:
+        n, hits = _match_score(p, kws)
+        scored.append((n, hits, p))
+    scored.sort(key=lambda x: (-x[0], x[2].get("rank", 99)))
+
+    matched = [(n, h, p) for n, h, p in scored if n > 0]
+    rest = [p for n, _h, p in scored if n == 0]
+
+    lines = [f"### {data.get('date')} — '{profile.get('name') or '내'}' 프로필 매칭 결과"]
+    if ov.get("text"):
+        lines.append(f"\n📡 오늘의 흐름: {ov['text']}")
+    lines.append(f"\n**프로필 topics:** {', '.join(profile.get('topics', []))}")
+    if matched:
+        lines.append(f"\n## 🎯 관련 논문 {len(matched)}편")
+        for n, hits, p in matched:
+            lines.append(
+                f"\n- **{p['title']}** ({p['arxiv_id']}) — 매칭: {', '.join(hits)}\n"
+                f"  {p.get('one_liner', '')}\n"
+                f"  → https://hotpaper.ai/paper/{p['arxiv_id']}")
+    else:
+        lines.append("\n(오늘은 키워드 직접 매칭이 없음 — 아래 전체 목록에서 "
+                     "의미상 관련된 것을 골라 설명해 주세요)")
+    lines.append(f"\n## 나머지 {len(rest)}편 (제목만)")
+    for p in rest:
+        lines.append(f"- {p['title']} ({p['arxiv_id']})")
+    lines.append("\n(매칭은 단순 키워드 기준입니다 — 제목/한줄요약을 보고 "
+                 "의미상 관련된 논문을 추가로 짚어 주면 좋습니다)")
+    return "\n".join(lines)
+
+
 async def tool_popular_tags(limit: int = 30) -> str:
     """인기 dynamic tag."""
     data = await _get("/tags/popular", params={"limit": limit, "min_count": 2})
@@ -176,6 +274,29 @@ async def list_tools() -> list[Tool]:
                  "type": "object",
                  "properties": {"limit": {"type": "integer", "default": 30, "minimum": 5, "maximum": 100}},
              }),
+        Tool(name="hotpaper_save_profile",
+             description=("사용자의 연구 프로필을 로컬(~/.hotpaper/profile.json)에 저장. "
+                          "사용자의 연구 폴더/논문/노트를 읽고 topics(사람이 읽는 주제 3-7개)와 "
+                          "keywords(매칭용 영문 소문자 키워드 10-25개, hotpaper tag 스타일: "
+                          "'diffusion-models', 'fault-diagnosis' 등)를 추출해 호출하세요. "
+                          "로컬에만 저장되며 어떤 서버로도 전송되지 않습니다."),
+             inputSchema={
+                 "type": "object",
+                 "properties": {
+                     "topics": {"type": "array", "items": {"type": "string"}},
+                     "keywords": {"type": "array", "items": {"type": "string"}},
+                     "name": {"type": "string", "description": "사용자 이름/별칭 (선택)"},
+                     "description": {"type": "string", "description": "연구 한 줄 소개 (선택)"},
+                 },
+                 "required": ["topics", "keywords"],
+             }),
+        Tool(name="hotpaper_get_profile",
+             description="저장된 로컬 연구 프로필 조회 (없으면 만들기 안내).",
+             inputSchema={"type": "object", "properties": {}}),
+        Tool(name="hotpaper_today_for_me",
+             description=("오늘 featured 논문을 사용자 프로필과 매칭 — 관련 논문(매칭 키워드 포함) + "
+                          "나머지 제목 목록 반환. '오늘 내 연구 관련 논문 뭐 나왔어?' 류 질문에 사용."),
+             inputSchema={"type": "object", "properties": {}}),
     ]
 
 
@@ -192,6 +313,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             text = await tool_tag_papers(arguments["tag"], arguments.get("limit", 20))
         elif name == "hotpaper_popular_tags":
             text = await tool_popular_tags(arguments.get("limit", 30))
+        elif name == "hotpaper_save_profile":
+            text = tool_save_profile(
+                arguments["topics"], arguments["keywords"],
+                arguments.get("name", ""), arguments.get("description", ""))
+        elif name == "hotpaper_get_profile":
+            text = tool_get_profile()
+        elif name == "hotpaper_today_for_me":
+            text = await tool_today_for_me()
         else:
             text = f"Unknown tool: {name}"
     except httpx.HTTPStatusError as e:
@@ -206,5 +335,10 @@ async def main():
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def cli_main():
+    """console_scripts entry point (uvx/pipx: `hotpaper-mcp`)."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    cli_main()

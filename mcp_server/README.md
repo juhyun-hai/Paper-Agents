@@ -1,5 +1,9 @@
 # HotPaper MCP server
 
+> **연구실 공유용 5분 설정 가이드: [docs/COMPANION.md](../docs/COMPANION.md)**
+> (uvx 한 줄 설치 + 개인 연구 프로필 매칭 — Claude Code/Desktop/Codex/Cursor)
+
+
 Claude Desktop / Cursor / Claude Code에서 HotPaper.ai DB를 검색하는 MCP server.
 
 ## 설치
