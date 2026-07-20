@@ -58,8 +58,14 @@ if ! docker exec paper-agent-github-postgres-1 pg_isready -U research_agent -q 2
   fi
 fi
 
-# 4. Cloudflared tunnel
-if ! systemctl --user is-active --quiet hotpaper-tunnel.service; then
-  systemctl --user restart hotpaper-tunnel.service
-  notify "HotPaper watchdog" "Tunnel was down — restarted"
+# 4. Cloudflared tunnel — systemctl --user는 cron의 DBUS 환경에서
+#    간헐 실패(오판)하므로 실제 외부 도달성(HTTP)으로 판정한다.
+if ! curl -s -m 10 -o /dev/null https://api.hotpaper.ai/health; then
+  systemctl --user restart hotpaper-tunnel.service 2>/dev/null
+  sleep 8
+  if curl -s -m 10 -o /dev/null https://api.hotpaper.ai/health; then
+    notify "HotPaper watchdog" "Tunnel was unreachable — restarted OK"
+  else
+    notify "HotPaper watchdog" "Tunnel unreachable and restart FAILED — 외부 접속 불가 상태"
+  fi
 fi
