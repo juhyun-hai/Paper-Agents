@@ -66,10 +66,16 @@ codex mcp add hotpaper -- \
 | 하고 싶은 것 | 이렇게 말하세요 |
 |---|---|
 | 오늘 내 관련 논문 | **"오늘 hotpaper에서 내 연구 관련 논문 뭐 나왔어?"** |
+| 🔬 **연구 연결 브리핑** | **"이 논문 내 연구에 어떻게 써먹을 수 있어?"** / "확장 아이디어 줘" |
+| 읽을 가치 판단 | "2607.13431 나한테 읽을 가치 있어?" |
 | 전체 25편 | "오늘 hotpaper 논문 다 보여줘" |
 | 주제 검색 | "hotpaper에서 uncertainty-aware fault diagnosis 검색해줘" |
 | 논문 깊이 읽기 | "2607.13431 한국어 요약 보여줘" |
 | 트렌드 파악 | "요즘 hotpaper에서 뜨는 키워드 뭐야?" |
+
+**🔬 연구 연결 브리핑**이 핵심입니다 — hotpaper의 딥요약을 근거로
+① 내 연구와의 접점 ② 적용/확장 아이디어 2-3개 ③ 다음 읽기 경로를 안내합니다.
+(요약에 없는 수치는 지어내지 않도록 설계됨)
 
 `hotpaper_today_for_me`가 프로필 키워드로 1차 매칭을 하고,
 에이전트가 의미상 관련된 논문까지 짚어서 설명해줍니다.
@@ -88,8 +94,9 @@ codex mcp add hotpaper -- \
 아니요. 지능은 여러분이 쓰는 에이전트(Claude/Codex)가 담당합니다.
 
 **Q. 제공 도구 전체 목록?**
-`hotpaper_today` · `hotpaper_today_for_me` · `hotpaper_search` · `hotpaper_paper` ·
-`hotpaper_tag_papers` · `hotpaper_popular_tags` · `hotpaper_save_profile` · `hotpaper_get_profile`
+`hotpaper_today` · `hotpaper_today_for_me` · `hotpaper_research_brief` · `hotpaper_search` ·
+`hotpaper_paper` · `hotpaper_tag_papers` · `hotpaper_popular_tags` ·
+`hotpaper_save_profile` · `hotpaper_get_profile`
 
 **Q. 업데이트는?**
 `uvx`는 실행 시 git에서 받아오므로, 재시작하면 최신입니다 (캐시 갱신: `uv cache clean hotpaper-companion`).

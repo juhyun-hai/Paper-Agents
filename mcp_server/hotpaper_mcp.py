@@ -216,8 +216,70 @@ async def tool_today_for_me() -> str:
     for p in rest:
         lines.append(f"- {p['title']} ({p['arxiv_id']})")
     lines.append("\n(매칭은 단순 키워드 기준입니다 — 제목/한줄요약을 보고 "
-                 "의미상 관련된 논문을 추가로 짚어 주면 좋습니다)")
+                 "의미상 관련된 논문을 추가로 짚어 주면 좋습니다. "
+                 "특정 논문을 사용자 연구와 깊이 연결하려면 "
+                 "hotpaper_research_brief(arxiv_id)를 호출하세요)")
     return "\n".join(lines)
+
+
+async def tool_research_brief(arxiv_id: str) -> str:
+    """research agent 재료 패킷: 프로필 + 딥요약 전문 + 관련 논문.
+
+    호스트 에이전트가 이걸 근거로 '내 연구와의 접점 → 확장 아이디어 →
+    다음 읽기 경로'를 브리핑하도록 지시문까지 포함해 반환한다.
+    """
+    profile = _load_profile() or {}
+
+    # 한국어 딥요약 전문 (hotpaper의 핵심 자산 — 이걸 근거로 안내)
+    summary_text, title = "", arxiv_id
+    try:
+        sd = await _get(f"/summary/{arxiv_id}")
+        s = sd.get("summary") or {}
+        summary_text = s.get("summary_text", "")
+        title = s.get("title") or title
+    except Exception:
+        pass
+
+    # 임베딩 기반 관련 논문
+    related = []
+    try:
+        rd = await _get(f"/recommend/{arxiv_id}", params={"limit": 5})
+        related = rd.get("recommendations") or []
+    except Exception:
+        pass
+
+    parts = [f"# 연구 연결 브리핑 재료 — {title} ({arxiv_id})"]
+    if profile:
+        parts.append(
+            "\n## 사용자 연구 프로필\n"
+            f"- topics: {', '.join(profile.get('topics', []))}\n"
+            f"- keywords: {', '.join(profile.get('keywords', [])[:20])}\n"
+            f"- 소개: {profile.get('description', '')}")
+    else:
+        parts.append("\n## 사용자 연구 프로필\n(없음 — 일반 독자 기준으로 브리핑)")
+
+    if summary_text:
+        parts.append(f"\n## hotpaper 한국어 딥요약 (근거 자료)\n{summary_text[:4000]}")
+    else:
+        parts.append("\n## hotpaper 요약\n(아직 없음 — 사이트에서 생성 대기 중일 수 있음)")
+
+    if related:
+        parts.append("\n## 임베딩 기반 관련 논문 (다음 읽기 후보)")
+        for p in related[:5]:
+            parts.append(f"- {p.get('title', '?')} ({p.get('arxiv_id', '?')}) "
+                         f"→ https://hotpaper.ai/paper/{p.get('arxiv_id', '')}")
+
+    parts.append(
+        "\n---\n"
+        "[에이전트 지시] 위 자료만 근거로, 사용자에게 한국어로 다음 구조의 "
+        "연구 연결 브리핑을 작성하세요:\n"
+        "1. **내 연구와의 접점** — 프로필 topics와 이 논문의 방법/문제의식이 만나는 지점 (1-2개, 구체적으로)\n"
+        "2. **확장 아이디어** — 이 논문의 기법을 사용자 연구에 적용/변형하는 구체적 방향 2-3개 "
+        "(요약에 명시된 모듈·수치를 인용해 근거 제시)\n"
+        "3. **다음 읽기 경로** — 관련 논문 중 사용자 프로필에 맞는 순서 추천\n"
+        "요약에 없는 실험 수치는 지어내지 말 것. "
+        f"전문/그림은 https://hotpaper.ai/paper/{arxiv_id} 안내.")
+    return "\n".join(parts)
 
 
 async def tool_popular_tags(limit: int = 30) -> str:
@@ -295,8 +357,20 @@ async def list_tools() -> list[Tool]:
              inputSchema={"type": "object", "properties": {}}),
         Tool(name="hotpaper_today_for_me",
              description=("오늘 featured 논문을 사용자 프로필과 매칭 — 관련 논문(매칭 키워드 포함) + "
-                          "나머지 제목 목록 반환. '오늘 내 연구 관련 논문 뭐 나왔어?' 류 질문에 사용."),
+                          "나머지 제목 목록 반환. '오늘 내 연구 관련 논문 뭐 나왔어?' 류 질문에 사용. "
+                          "매칭된 논문을 더 깊이 연결하고 싶으면 hotpaper_research_brief로 이어가세요."),
              inputSchema={"type": "object", "properties": {}}),
+        Tool(name="hotpaper_research_brief",
+             description=("research agent 모드: 특정 논문을 사용자 연구와 연결 — "
+                          "hotpaper 한국어 딥요약 전문 + 사용자 프로필 + 임베딩 관련 논문을 재료로 반환. "
+                          "'이 논문 내 연구에 어떻게 써먹을 수 있어?', '확장 아이디어 줘', "
+                          "'이거 읽을 가치 있어?' 류 질문에 사용. 반환된 지시 구조"
+                          "(접점→확장 아이디어→다음 읽기)대로 브리핑할 것."),
+             inputSchema={
+                 "type": "object",
+                 "properties": {"arxiv_id": {"type": "string", "description": "예: 2607.13431"}},
+                 "required": ["arxiv_id"],
+             }),
     ]
 
 
@@ -321,6 +395,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             text = tool_get_profile()
         elif name == "hotpaper_today_for_me":
             text = await tool_today_for_me()
+        elif name == "hotpaper_research_brief":
+            text = await tool_research_brief(arguments["arxiv_id"])
         else:
             text = f"Unknown tool: {name}"
     except httpx.HTTPStatusError as e:
