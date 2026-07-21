@@ -47,42 +47,129 @@ except ImportError:
 BASE = os.environ.get("HOTPAPER_API", "https://api.hotpaper.ai/api").rstrip("/")
 TIMEOUT = 30.0
 
-# 개인화 프로필 — 사용자 로컬에만 저장, 서버로 전송되지 않음.
-PROFILE_PATH = Path(os.environ.get(
-    "HOTPAPER_PROFILE", str(Path.home() / ".hotpaper" / "profile.json")))
-# 아이디어 인큐베이터 로그 (JSON Lines) — 논문에서 온 아이디어 + 내 아이디어가
-# 함께 쌓이는 곳. 로컬 전용.
-IDEAS_PATH = Path(os.environ.get(
-    "HOTPAPER_IDEAS", str(Path.home() / ".hotpaper" / "ideas.jsonl")))
+# 폴더별 프로젝트 저장을 위한 공용 인자 스키마. 에이전트가 자기 현재 작업
+# 폴더의 절대경로를 넣도록 유도한다 (MCP 서버 cwd가 불확실한 환경 대비).
+_WS = {
+    "type": "string",
+    "description": ("현재 작업 폴더의 절대경로. 폴더별로 프로필·아이디어를 분리 "
+                    "관리하기 위한 것으로, 가능하면 항상 현재 열려 있는 폴더 경로를 "
+                    "넣어 주세요 (예: '/Users/me/research/fault-diagnosis'). "
+                    "비워두면 서버가 현재 폴더를 자동 감지하거나 전역으로 저장합니다."),
+}
+
+# ── 저장 스코프 (폴더별 프로젝트 or 전역) ─────────────────────────────
+# 프로필/아이디어는 모두 로컬에만 저장되며 서버로 전송되지 않는다.
+#
+# 해석 우선순위 (workspace_root 결정):
+#   1) 도구 인자 workspace  — 에이전트가 넘긴 작업 폴더 절대경로 (가장 신뢰)
+#   2) env HOTPAPER_HOME    — 강제 지정
+#   3) cwd에서 위로 .hotpaper/ 탐색 (홈 경계에서 멈춤, git 스타일)
+#   4) 전역 ~/.hotpaper/     — 아무 프로젝트도 없을 때
+GLOBAL_ROOT = Path(os.environ.get(
+    "HOTPAPER_HOME", str(Path.home() / ".hotpaper"))).expanduser()
+REGISTRY_PATH = GLOBAL_ROOT / "registry.json"
+_DOT = ".hotpaper"
 
 
-def _load_profile() -> dict | None:
+def _norm(p) -> Path:
+    return Path(p).expanduser().resolve()
+
+
+def _find_project_root(start: Path) -> Path | None:
+    """start에서 위로 올라가며 .hotpaper/ 가진 폴더를 찾는다 (홈 밖으로 안 나감)."""
     try:
-        return json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        cur = _norm(start)
+    except Exception:
+        return None
+    home = _norm(Path.home())
+    while True:
+        if (cur / _DOT).is_dir():
+            return cur
+        if cur == cur.parent:            # 파일시스템 루트
+            return None
+        # 홈 위(부모)로는 올라가지 않는다 — 홈 자신은 허용
+        if cur == home:
+            return None
+        cur = cur.parent
+
+
+def _load_registry() -> list[str]:
+    try:
+        return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def _register_project(root: Path) -> None:
+    reg = _load_registry()
+    s = str(root)
+    if s not in reg:
+        reg.append(s)
+        GLOBAL_ROOT.mkdir(parents=True, exist_ok=True)
+        REGISTRY_PATH.write_text(
+            json.dumps(reg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def resolve_store(workspace: str | None = None, create: bool = False) -> dict:
+    """활성 저장 위치를 결정.
+
+    Returns dict: {dir: Path(.hotpaper), scope: 'project'|'project-new'|'global',
+                   root: str(프로젝트 폴더 or 전역경로)}
+    create=True (프로필 만들기/init 등 '프로젝트 시작' 액션)일 때만,
+    프로젝트를 못 찾으면 현재 위치에 .hotpaper/ 를 새로 만든다.
+    """
+    # 시작 경로: workspace 인자 > cwd
+    if workspace:
+        start = _norm(workspace)
+    else:
+        try:
+            start = Path.cwd()
+        except Exception:
+            start = Path.home()
+
+    root = _find_project_root(start)
+    if root:
+        d = root / _DOT
+        d.mkdir(parents=True, exist_ok=True)
+        return {"dir": d, "scope": "project", "root": str(root)}
+
+    if create:
+        base = start if start.is_dir() else _norm(Path.home())
+        d = base / _DOT
+        d.mkdir(parents=True, exist_ok=True)
+        _register_project(base)
+        return {"dir": d, "scope": "project-new", "root": str(base)}
+
+    GLOBAL_ROOT.mkdir(parents=True, exist_ok=True)
+    return {"dir": GLOBAL_ROOT, "scope": "global", "root": str(GLOBAL_ROOT)}
+
+
+def _scope_header(store: dict) -> str:
+    if store["scope"] == "global":
+        return f"📁 전역 (프로젝트 아님): {store['root']}"
+    tag = " · 새로 만듦" if store["scope"] == "project-new" else ""
+    return f"📁 프로젝트: {store['root']}{tag}"
+
+
+# ── 프로필 / 아이디어 I/O (스코프 dir 기준) ───────────────────────────
+def _load_profile(store: dict) -> dict | None:
+    try:
+        return json.loads((store["dir"] / "profile.json").read_text(encoding="utf-8"))
     except Exception:
         return None
 
 
-def _save_profile(profile: dict) -> None:
-    PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PROFILE_PATH.write_text(
+def _save_profile(store: dict, profile: dict) -> None:
+    (store["dir"] / "profile.json").write_text(
         json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _append_idea(entry: dict) -> int:
-    IDEAS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    existing = _load_ideas()
-    entry["id"] = (max((e.get("id", 0) for e in existing), default=0) + 1)
-    with IDEAS_PATH.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    return entry["id"]
-
-
-def _load_ideas() -> list[dict]:
-    if not IDEAS_PATH.exists():
+def _load_ideas(store: dict) -> list[dict]:
+    p = store["dir"] / "ideas.jsonl"
+    if not p.exists():
         return []
     out = []
-    for line in IDEAS_PATH.read_text(encoding="utf-8").splitlines():
+    for line in p.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -91,6 +178,14 @@ def _load_ideas() -> list[dict]:
         except Exception:
             pass
     return out
+
+
+def _append_idea(store: dict, entry: dict) -> int:
+    existing = _load_ideas(store)
+    entry["id"] = max((e.get("id", 0) for e in existing), default=0) + 1
+    with (store["dir"] / "ideas.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return entry["id"]
 
 
 async def _get(path: str, params: dict | None = None) -> dict:
@@ -170,9 +265,37 @@ async def tool_tag_papers(tag: str, limit: int = 20) -> str:
     return f"### Tag '{tag}' ({len(papers)}편)\n\n{_format_papers(papers, limit)}"
 
 
+def tool_workspace_status(workspace: str | None = None) -> str:
+    """지금 어느 스코프에 저장되는지 + 등록된 프로젝트 목록."""
+    store = resolve_store(workspace, create=False)
+    prof = _load_profile(store)
+    ideas = _load_ideas(store)
+    lines = [_scope_header(store),
+             f"- 프로필: {'있음 (' + (prof.get('name') or '이름없음') + ')' if prof else '없음'}",
+             f"- 아이디어: {len(ideas)}조각"]
+    if store["scope"] == "global":
+        lines.append("  ⚠️ 지금은 전역 스코프예요. 이 폴더를 프로젝트로 관리하려면 "
+                     "hotpaper_init_workspace 를 호출하거나 그냥 프로필을 저장하세요.")
+    reg = _load_registry()
+    if reg:
+        lines.append(f"\n등록된 프로젝트 {len(reg)}개:")
+        for r in reg:
+            lines.append(f"  · {r}")
+    return "\n".join(lines)
+
+
+def tool_init_workspace(workspace: str | None = None) -> str:
+    """현재(또는 지정) 폴더를 hotpaper 프로젝트로 만든다 (.hotpaper/ 생성)."""
+    store = resolve_store(workspace, create=True)
+    return (f"✅ 프로젝트 준비됨\n{_scope_header(store)}\n"
+            "이제 이 폴더에서 만든 프로필·아이디어는 여기에만 쌓입니다. "
+            "다른 폴더에서 열면 별개로 관리돼요.")
+
+
 def tool_save_profile(topics: list, keywords: list, name: str = "",
-                       description: str = "") -> str:
-    """연구 프로필을 로컬(~/.hotpaper/profile.json)에 저장."""
+                      description: str = "", workspace: str | None = None) -> str:
+    """연구 프로필을 로컬에 저장 (프로젝트 폴더가 있으면 거기, 없으면 현재 폴더에 생성)."""
+    store = resolve_store(workspace, create=True)  # 프로필 저장 = 프로젝트 시작
     profile = {
         "name": name,
         "topics": [str(t).strip() for t in topics if str(t).strip()],
@@ -180,20 +303,21 @@ def tool_save_profile(topics: list, keywords: list, name: str = "",
         "description": description,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    _save_profile(profile)
-    return (f"✅ 프로필 저장됨 → {PROFILE_PATH}\n"
+    _save_profile(store, profile)
+    return (f"✅ 프로필 저장됨\n{_scope_header(store)}\n"
             f"- topics: {', '.join(profile['topics'])}\n"
             f"- keywords ({len(profile['keywords'])}): {', '.join(profile['keywords'][:15])}"
             f"{' …' if len(profile['keywords']) > 15 else ''}\n"
-            f"(이 파일은 로컬에만 저장되며 서버로 전송되지 않습니다)")
+            f"(로컬에만 저장되며 서버로 전송되지 않습니다)")
 
 
-def tool_get_profile() -> str:
-    p = _load_profile()
+def tool_get_profile(workspace: str | None = None) -> str:
+    store = resolve_store(workspace, create=False)
+    p = _load_profile(store)
     if not p:
-        return ("(프로필 없음) hotpaper_save_profile로 만들 수 있어요.\n"
-                "예: 사용자의 연구 폴더/노트를 읽고 topics·keywords를 추출한 뒤 저장하세요.")
-    return json.dumps(p, ensure_ascii=False, indent=2)
+        return (f"{_scope_header(store)}\n(프로필 없음) hotpaper_save_profile로 만들 수 있어요.\n"
+                "사용자의 연구 폴더/노트를 읽고 topics·keywords를 추출한 뒤 저장하세요.")
+    return _scope_header(store) + "\n" + json.dumps(p, ensure_ascii=False, indent=2)
 
 
 def _match_score(paper: dict, keywords: list[str]) -> tuple[int, list[str]]:
@@ -206,11 +330,12 @@ def _match_score(paper: dict, keywords: list[str]) -> tuple[int, list[str]]:
     return len(hits), hits
 
 
-async def tool_today_for_me() -> str:
+async def tool_today_for_me(workspace: str | None = None) -> str:
     """오늘 featured를 프로필과 매칭 — 관련 논문 상세 + 나머지는 제목만."""
-    profile = _load_profile()
+    store = resolve_store(workspace, create=False)
+    profile = _load_profile(store)
     if not profile:
-        return ("프로필이 없습니다. 먼저 사용자의 연구 폴더/논문/노트를 읽고 "
+        return (f"{_scope_header(store)}\n프로필이 없습니다. 먼저 사용자의 연구 폴더/논문/노트를 읽고 "
                 "hotpaper_save_profile(topics, keywords)로 프로필을 만들어 주세요.")
     kws = profile.get("keywords", [])
     data = await _get("/feed/daily", params={"limit": 25})
@@ -226,7 +351,8 @@ async def tool_today_for_me() -> str:
     matched = [(n, h, p) for n, h, p in scored if n > 0]
     rest = [p for n, _h, p in scored if n == 0]
 
-    lines = [f"### {data.get('date')} — '{profile.get('name') or '내'}' 프로필 매칭 결과"]
+    lines = [_scope_header(store),
+             f"### {data.get('date')} — '{profile.get('name') or '내'}' 프로필 매칭 결과"]
     if ov.get("text"):
         lines.append(f"\n📡 오늘의 흐름: {ov['text']}")
     lines.append(f"\n**프로필 topics:** {', '.join(profile.get('topics', []))}")
@@ -250,13 +376,14 @@ async def tool_today_for_me() -> str:
     return "\n".join(lines)
 
 
-async def tool_research_brief(arxiv_id: str) -> str:
+async def tool_research_brief(arxiv_id: str, workspace: str | None = None) -> str:
     """research agent 재료 패킷: 프로필 + 딥요약 전문 + 관련 논문.
 
     호스트 에이전트가 이걸 근거로 '내 연구와의 접점 → 확장 아이디어 →
     다음 읽기 경로'를 브리핑하도록 지시문까지 포함해 반환한다.
     """
-    profile = _load_profile() or {}
+    store = resolve_store(workspace, create=False)
+    profile = _load_profile(store) or {}
 
     # 한국어 딥요약 전문 (hotpaper의 핵심 자산 — 이걸 근거로 안내)
     summary_text, title = "", arxiv_id
@@ -311,11 +438,13 @@ async def tool_research_brief(arxiv_id: str) -> str:
 
 
 def tool_idea_log(text: str, source: str = "paper",
-                  papers: list | None = None, tags: list | None = None) -> str:
+                  papers: list | None = None, tags: list | None = None,
+                  workspace: str | None = None) -> str:
     """아이디어 한 조각을 로컬 인큐베이터 로그에 추가.
 
     source: 'paper'(논문에서 발견) | 'mine'(내 생각) | 'combined'(조합해 만든 새 아이디어)
     """
+    store = resolve_store(workspace, create=False)
     entry = {
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "text": text.strip(),
@@ -323,32 +452,32 @@ def tool_idea_log(text: str, source: str = "paper",
         "papers": [str(p) for p in (papers or [])],
         "tags": [str(t).strip().lower() for t in (tags or []) if str(t).strip()],
     }
-    idea_id = _append_idea(entry)
+    idea_id = _append_idea(store, entry)
     label = {"paper": "논문 발견", "mine": "내 아이디어", "combined": "조합 아이디어"}[entry["source"]]
-    return (f"✅ 아이디어 #{idea_id} 저장됨 [{label}] → {IDEAS_PATH}\n"
+    return (f"✅ 아이디어 #{idea_id} 저장됨 [{label}]\n{_scope_header(store)}\n"
             f"  {entry['text'][:120]}\n"
             f"(로컬에만 저장됩니다. 'hotpaper_idea_board'로 지금까지 쌓인 걸 종합할 수 있어요)")
 
 
-def tool_idea_board(days: int = 0) -> str:
+def tool_idea_board(days: int = 0, workspace: str | None = None) -> str:
     """쌓인 아이디어 전부 + 종합/조합/수렴 지시를 반환 (research agent의 인큐베이터 모드)."""
-    ideas = _load_ideas()
+    store = resolve_store(workspace, create=False)
+    ideas = _load_ideas(store)
     if days > 0:
-        cutoff = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        # 단순 문자열 비교로 최근 N일 (YYYY-MM-DD 정렬 가능)
         from datetime import timedelta
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
         ideas = [i for i in ideas if i.get("date", "") >= since]
     if not ideas:
-        return ("(아이디어 로그가 비어 있습니다) hotpaper_idea_log로 조각을 쌓기 시작하세요.\n"
+        return (f"{_scope_header(store)}\n(아이디어 로그가 비어 있습니다) "
+                "hotpaper_idea_log로 조각을 쌓기 시작하세요.\n"
                 "예: 오늘 논문을 보다가 떠오른 빈틈, 내 머릿속 아이디어, 두 개를 합친 조합 등.")
 
-    profile = _load_profile() or {}
+    profile = _load_profile(store) or {}
     by_source = {"paper": [], "mine": [], "combined": []}
     for i in ideas:
         by_source.get(i.get("source", "paper"), by_source["paper"]).append(i)
 
-    lines = [f"# 아이디어 인큐베이터 — 누적 {len(ideas)}조각"]
+    lines = [_scope_header(store), f"# 아이디어 인큐베이터 — 누적 {len(ideas)}조각"]
     if profile.get("topics"):
         lines.append(f"\n관심 영역: {', '.join(profile['topics'])}")
     for src, label in [("paper", "📄 논문에서 발견"), ("mine", "💡 내 아이디어"),
@@ -373,11 +502,12 @@ def tool_idea_board(days: int = 0) -> str:
     return "\n".join(lines)
 
 
-async def tool_incubate() -> str:
+async def tool_incubate(workspace: str | None = None) -> str:
     """오늘 논문(프로필 매칭) + 쌓인 아이디어를 함께 보고 '빈틈·연결·새 조합'을 찾는 재료 패킷."""
-    profile = _load_profile() or {}
+    store = resolve_store(workspace, create=False)
+    profile = _load_profile(store) or {}
     kws = profile.get("keywords", [])
-    ideas = _load_ideas()
+    ideas = _load_ideas(store)
 
     data = await _get("/feed/daily", params={"limit": 25})
     papers = data.get("papers", [])
@@ -390,7 +520,7 @@ async def tool_incubate() -> str:
         scored.append((n, hits, p))
     scored.sort(key=lambda x: (-x[0], x[2].get("rank", 99)))
 
-    lines = [f"# 아이디어 인큐베이션 — {data.get('date')}"]
+    lines = [_scope_header(store), f"# 아이디어 인큐베이션 — {data.get('date')}"]
     if profile.get("topics"):
         lines.append(f"관심 영역: {', '.join(profile['topics'])}")
     if ov.get("text"):
@@ -476,12 +606,22 @@ async def list_tools() -> list[Tool]:
                  "type": "object",
                  "properties": {"limit": {"type": "integer", "default": 30, "minimum": 5, "maximum": 100}},
              }),
+        Tool(name="hotpaper_init_workspace",
+             description=("현재 폴더를 hotpaper 프로젝트로 만든다 (.hotpaper/ 생성). "
+                          "이후 이 폴더의 프로필·아이디어는 여기에만 쌓이고 다른 폴더와 분리됨. "
+                          "'여기서 hotpaper 시작해줘', '이 폴더를 프로젝트로 만들어줘' 류에 사용. "
+                          "반드시 workspace에 현재 작업 폴더의 절대경로를 넘길 것."),
+             inputSchema={"type": "object", "properties": {"workspace": _WS}}),
+        Tool(name="hotpaper_workspace_status",
+             description=("지금 어느 스코프(프로젝트 폴더 or 전역)에 저장 중인지 + 등록된 프로젝트 "
+                          "목록. '지금 어느 프로젝트야?', '내 hotpaper 프로젝트 목록' 류에 사용."),
+             inputSchema={"type": "object", "properties": {"workspace": _WS}}),
         Tool(name="hotpaper_save_profile",
-             description=("사용자의 연구 프로필을 로컬(~/.hotpaper/profile.json)에 저장. "
-                          "사용자의 연구 폴더/논문/노트를 읽고 topics(사람이 읽는 주제 3-7개)와 "
-                          "keywords(매칭용 영문 소문자 키워드 10-25개, hotpaper tag 스타일: "
-                          "'diffusion-models', 'fault-diagnosis' 등)를 추출해 호출하세요. "
-                          "로컬에만 저장되며 어떤 서버로도 전송되지 않습니다."),
+             description=("사용자의 연구 프로필을 로컬에 저장. 사용자의 연구 폴더/논문/노트를 읽고 "
+                          "topics(사람이 읽는 주제 3-7개)와 keywords(매칭용 영문 소문자 10-25개, "
+                          "hotpaper tag 스타일: 'diffusion-models', 'fault-diagnosis')를 추출해 호출. "
+                          "저장 위치: workspace에 프로젝트(.hotpaper/)가 있으면 거기, 없으면 현재 폴더에 "
+                          "새 프로젝트 생성. 로컬에만 저장되며 서버로 전송되지 않음."),
              inputSchema={
                  "type": "object",
                  "properties": {
@@ -489,17 +629,18 @@ async def list_tools() -> list[Tool]:
                      "keywords": {"type": "array", "items": {"type": "string"}},
                      "name": {"type": "string", "description": "사용자 이름/별칭 (선택)"},
                      "description": {"type": "string", "description": "연구 한 줄 소개 (선택)"},
+                     "workspace": _WS,
                  },
                  "required": ["topics", "keywords"],
              }),
         Tool(name="hotpaper_get_profile",
              description="저장된 로컬 연구 프로필 조회 (없으면 만들기 안내).",
-             inputSchema={"type": "object", "properties": {}}),
+             inputSchema={"type": "object", "properties": {"workspace": _WS}}),
         Tool(name="hotpaper_today_for_me",
              description=("오늘 featured 논문을 사용자 프로필과 매칭 — 관련 논문(매칭 키워드 포함) + "
                           "나머지 제목 목록 반환. '오늘 내 연구 관련 논문 뭐 나왔어?' 류 질문에 사용. "
                           "매칭된 논문을 더 깊이 연결하고 싶으면 hotpaper_research_brief로 이어가세요."),
-             inputSchema={"type": "object", "properties": {}}),
+             inputSchema={"type": "object", "properties": {"workspace": _WS}}),
         Tool(name="hotpaper_research_brief",
              description=("research agent 모드: 특정 논문을 사용자 연구와 연결 — "
                           "hotpaper 한국어 딥요약 전문 + 사용자 프로필 + 임베딩 관련 논문을 재료로 반환. "
@@ -508,7 +649,8 @@ async def list_tools() -> list[Tool]:
                           "(접점→확장 아이디어→다음 읽기)대로 브리핑할 것."),
              inputSchema={
                  "type": "object",
-                 "properties": {"arxiv_id": {"type": "string", "description": "예: 2607.13431"}},
+                 "properties": {"arxiv_id": {"type": "string", "description": "예: 2607.13431"},
+                                "workspace": _WS},
                  "required": ["arxiv_id"],
              }),
         Tool(name="hotpaper_incubate",
@@ -516,9 +658,9 @@ async def list_tools() -> list[Tool]:
                           "아이디어를 함께 보고 '빈틈(아직 내 분야에 안 쓰인 기술=기회) · 연결 · "
                           "새 조합'을 찾는다. '오늘 파볼 만한 빈틈 찾아줘', '오늘 뭐 인큐베이트 "
                           "할까?' 류에 사용. 발견은 hotpaper_idea_log로 저장 유도."),
-             inputSchema={"type": "object", "properties": {}}),
+             inputSchema={"type": "object", "properties": {"workspace": _WS}}),
         Tool(name="hotpaper_idea_log",
-             description=("아이디어 한 조각을 로컬 인큐베이터 노트(~/.hotpaper/ideas.jsonl)에 저장. "
+             description=("아이디어 한 조각을 로컬 인큐베이터 노트에 저장. "
                           "논문에서 발견한 빈틈, 사용자 본인의 아이디어, 둘을 합친 새 조합 모두 저장 가능. "
                           "'이 아이디어 저장해줘', '내 생각 적어둬' 류에 사용."),
              inputSchema={
@@ -530,6 +672,7 @@ async def list_tools() -> list[Tool]:
                      "papers": {"type": "array", "items": {"type": "string"},
                                 "description": "관련 arxiv id (선택)"},
                      "tags": {"type": "array", "items": {"type": "string"}},
+                     "workspace": _WS,
                  },
                  "required": ["text"],
              }),
@@ -540,7 +683,8 @@ async def list_tools() -> list[Tool]:
              inputSchema={
                  "type": "object",
                  "properties": {"days": {"type": "integer", "default": 0,
-                                         "description": "최근 N일만 (0=전체)"}},
+                                         "description": "최근 N일만 (0=전체)"},
+                                "workspace": _WS},
              }),
     ]
 
@@ -558,24 +702,30 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             text = await tool_tag_papers(arguments["tag"], arguments.get("limit", 20))
         elif name == "hotpaper_popular_tags":
             text = await tool_popular_tags(arguments.get("limit", 30))
+        elif name == "hotpaper_init_workspace":
+            text = tool_init_workspace(arguments.get("workspace"))
+        elif name == "hotpaper_workspace_status":
+            text = tool_workspace_status(arguments.get("workspace"))
         elif name == "hotpaper_save_profile":
             text = tool_save_profile(
                 arguments["topics"], arguments["keywords"],
-                arguments.get("name", ""), arguments.get("description", ""))
+                arguments.get("name", ""), arguments.get("description", ""),
+                arguments.get("workspace"))
         elif name == "hotpaper_get_profile":
-            text = tool_get_profile()
+            text = tool_get_profile(arguments.get("workspace"))
         elif name == "hotpaper_today_for_me":
-            text = await tool_today_for_me()
+            text = await tool_today_for_me(arguments.get("workspace"))
         elif name == "hotpaper_research_brief":
-            text = await tool_research_brief(arguments["arxiv_id"])
+            text = await tool_research_brief(arguments["arxiv_id"], arguments.get("workspace"))
         elif name == "hotpaper_incubate":
-            text = await tool_incubate()
+            text = await tool_incubate(arguments.get("workspace"))
         elif name == "hotpaper_idea_log":
             text = tool_idea_log(
                 arguments["text"], arguments.get("source", "paper"),
-                arguments.get("papers"), arguments.get("tags"))
+                arguments.get("papers"), arguments.get("tags"),
+                arguments.get("workspace"))
         elif name == "hotpaper_idea_board":
-            text = tool_idea_board(arguments.get("days", 0))
+            text = tool_idea_board(arguments.get("days", 0), arguments.get("workspace"))
         else:
             text = f"Unknown tool: {name}"
     except httpx.HTTPStatusError as e:

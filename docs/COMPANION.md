@@ -116,15 +116,28 @@ codex mcp add hotpaper -- \
 **Q. GPU/로컬 LLM 필요한가요?**
 아니요. 지능은 여러분이 쓰는 에이전트(Claude/Codex)가 담당합니다.
 
-**Q. 제공 도구 전체 목록? (12개)**
+**Q. 제공 도구 전체 목록? (14개)**
 `hotpaper_today` · `hotpaper_today_for_me` · `hotpaper_research_brief` ·
 `hotpaper_incubate` · `hotpaper_idea_log` · `hotpaper_idea_board` ·
+`hotpaper_init_workspace` · `hotpaper_workspace_status` ·
 `hotpaper_search` · `hotpaper_paper` · `hotpaper_tag_papers` ·
 `hotpaper_popular_tags` · `hotpaper_save_profile` · `hotpaper_get_profile`
 
-**Q. 아이디어 노트는 어디 저장되나요?**
-`~/.hotpaper/ideas.jsonl` — 로컬 파일입니다. 직접 열어봐도 되고, 다른 컴퓨터로
-복사하면 그대로 이어집니다. 서버로 전송되지 않습니다.
+**Q. 프로젝트(폴더)마다 따로 관리할 수 있나요?**
+네. **폴더별로 자동 분리**됩니다 (git이 폴더마다 `.git` 두는 것과 같은 방식).
+- 논문 폴더 A에서 프로필을 만들면 → `A/.hotpaper/` 에 저장
+- 다른 폴더 B에서 열면 → `B/.hotpaper/` 로 완전히 별개
+- 하위 폴더에서 열어도 상위의 프로젝트를 자동으로 찾습니다
+- 아무 폴더도 프로젝트가 아니면 → 전역 `~/.hotpaper/` (잡다한 용도)
+
+모든 응답 맨 위에 `📁 프로젝트: <경로>` 로 **지금 어디에 저장 중인지 항상 표시**됩니다.
+- **"여기서 hotpaper 시작해줘"** → 현재 폴더를 프로젝트로 만듦 (`hotpaper_init_workspace`)
+- **"지금 어느 프로젝트야?"** / "내 프로젝트 목록" → `hotpaper_workspace_status`
+
+**Q. 아이디어/프로필 파일 위치?**
+프로젝트면 `<폴더>/.hotpaper/{profile.json, ideas.jsonl}`, 전역이면 `~/.hotpaper/`.
+전부 로컬 파일 — 직접 열어봐도 되고, 폴더째 복사하면 다른 컴퓨터로 그대로 옮겨집니다.
+서버로 전송되지 않습니다.
 
 **Q. 업데이트는?**
 `uvx`는 실행 시 git에서 받아오므로, 재시작하면 최신입니다 (캐시 갱신: `uv cache clean hotpaper-companion`).
