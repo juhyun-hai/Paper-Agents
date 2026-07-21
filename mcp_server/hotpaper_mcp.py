@@ -50,6 +50,10 @@ TIMEOUT = 30.0
 # 개인화 프로필 — 사용자 로컬에만 저장, 서버로 전송되지 않음.
 PROFILE_PATH = Path(os.environ.get(
     "HOTPAPER_PROFILE", str(Path.home() / ".hotpaper" / "profile.json")))
+# 아이디어 인큐베이터 로그 (JSON Lines) — 논문에서 온 아이디어 + 내 아이디어가
+# 함께 쌓이는 곳. 로컬 전용.
+IDEAS_PATH = Path(os.environ.get(
+    "HOTPAPER_IDEAS", str(Path.home() / ".hotpaper" / "ideas.jsonl")))
 
 
 def _load_profile() -> dict | None:
@@ -63,6 +67,30 @@ def _save_profile(profile: dict) -> None:
     PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     PROFILE_PATH.write_text(
         json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _append_idea(entry: dict) -> int:
+    IDEAS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    existing = _load_ideas()
+    entry["id"] = (max((e.get("id", 0) for e in existing), default=0) + 1)
+    with IDEAS_PATH.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return entry["id"]
+
+
+def _load_ideas() -> list[dict]:
+    if not IDEAS_PATH.exists():
+        return []
+    out = []
+    for line in IDEAS_PATH.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except Exception:
+            pass
+    return out
 
 
 async def _get(path: str, params: dict | None = None) -> dict:
@@ -282,6 +310,118 @@ async def tool_research_brief(arxiv_id: str) -> str:
     return "\n".join(parts)
 
 
+def tool_idea_log(text: str, source: str = "paper",
+                  papers: list | None = None, tags: list | None = None) -> str:
+    """아이디어 한 조각을 로컬 인큐베이터 로그에 추가.
+
+    source: 'paper'(논문에서 발견) | 'mine'(내 생각) | 'combined'(조합해 만든 새 아이디어)
+    """
+    entry = {
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "text": text.strip(),
+        "source": source if source in ("paper", "mine", "combined") else "paper",
+        "papers": [str(p) for p in (papers or [])],
+        "tags": [str(t).strip().lower() for t in (tags or []) if str(t).strip()],
+    }
+    idea_id = _append_idea(entry)
+    label = {"paper": "논문 발견", "mine": "내 아이디어", "combined": "조합 아이디어"}[entry["source"]]
+    return (f"✅ 아이디어 #{idea_id} 저장됨 [{label}] → {IDEAS_PATH}\n"
+            f"  {entry['text'][:120]}\n"
+            f"(로컬에만 저장됩니다. 'hotpaper_idea_board'로 지금까지 쌓인 걸 종합할 수 있어요)")
+
+
+def tool_idea_board(days: int = 0) -> str:
+    """쌓인 아이디어 전부 + 종합/조합/수렴 지시를 반환 (research agent의 인큐베이터 모드)."""
+    ideas = _load_ideas()
+    if days > 0:
+        cutoff = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # 단순 문자열 비교로 최근 N일 (YYYY-MM-DD 정렬 가능)
+        from datetime import timedelta
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+        ideas = [i for i in ideas if i.get("date", "") >= since]
+    if not ideas:
+        return ("(아이디어 로그가 비어 있습니다) hotpaper_idea_log로 조각을 쌓기 시작하세요.\n"
+                "예: 오늘 논문을 보다가 떠오른 빈틈, 내 머릿속 아이디어, 두 개를 합친 조합 등.")
+
+    profile = _load_profile() or {}
+    by_source = {"paper": [], "mine": [], "combined": []}
+    for i in ideas:
+        by_source.get(i.get("source", "paper"), by_source["paper"]).append(i)
+
+    lines = [f"# 아이디어 인큐베이터 — 누적 {len(ideas)}조각"]
+    if profile.get("topics"):
+        lines.append(f"\n관심 영역: {', '.join(profile['topics'])}")
+    for src, label in [("paper", "📄 논문에서 발견"), ("mine", "💡 내 아이디어"),
+                       ("combined", "🔗 조합해서 만든 것")]:
+        items = by_source[src]
+        if not items:
+            continue
+        lines.append(f"\n## {label} ({len(items)})")
+        for i in items:
+            paps = f" [{', '.join(i['papers'])}]" if i.get("papers") else ""
+            lines.append(f"- #{i.get('id')} ({i.get('date')}) {i['text']}{paps}")
+
+    lines.append(
+        "\n---\n"
+        "[에이전트 지시] 위에 쌓인 아이디어들을 근거로 사용자에게 한국어로 종합해 주세요:\n"
+        "1. **수렴 방향** — 반복해서 등장하는 주제/키워드는? 사용자의 관심이 어디로 모이고 있나 (목표 후보)\n"
+        "2. **새 조합** — 서로 다른 조각 2-3개를 결합해 만들 수 있는 **새로운 연구 방향**을 "
+        "구체적으로 제안 (특히 '내 아이디어'와 '논문 발견'을 교차 결합). 만든 새 방향은 "
+        "hotpaper_idea_log(source='combined')로 다시 저장하도록 사용자에게 제안.\n"
+        "3. **다음 액션** — 가장 유망한 1-2개에 대해, 검증하려면 무엇을 더 읽거나 실험해야 하는지\n"
+        "억지로 연결하지 말고, 근거가 약하면 '아직 조각이 부족하다'고 솔직히 말할 것.")
+    return "\n".join(lines)
+
+
+async def tool_incubate() -> str:
+    """오늘 논문(프로필 매칭) + 쌓인 아이디어를 함께 보고 '빈틈·연결·새 조합'을 찾는 재료 패킷."""
+    profile = _load_profile() or {}
+    kws = profile.get("keywords", [])
+    ideas = _load_ideas()
+
+    data = await _get("/feed/daily", params={"limit": 25})
+    papers = data.get("papers", [])
+    ov = data.get("overview") or {}
+
+    # 프로필 매칭 상위 + 나머지 제목
+    scored = []
+    for p in papers:
+        n, hits = _match_score(p, kws)
+        scored.append((n, hits, p))
+    scored.sort(key=lambda x: (-x[0], x[2].get("rank", 99)))
+
+    lines = [f"# 아이디어 인큐베이션 — {data.get('date')}"]
+    if profile.get("topics"):
+        lines.append(f"관심 영역: {', '.join(profile['topics'])}")
+    if ov.get("text"):
+        lines.append(f"\n오늘의 흐름: {ov['text']}")
+
+    lines.append("\n## 오늘 논문 (제목 · 한줄요약)")
+    for n, hits, p in scored:
+        mark = f" ⭐{','.join(hits)}" if hits else ""
+        lines.append(f"- {p['title']} ({p['arxiv_id']}){mark}\n  {p.get('one_liner', '')}")
+
+    recent = ideas[-8:] if ideas else []
+    if recent:
+        lines.append(f"\n## 지금까지 쌓인 아이디어 (최근 {len(recent)}개)")
+        for i in recent:
+            lines.append(f"- #{i.get('id')} [{i.get('source')}] {i['text']}")
+    else:
+        lines.append("\n## 지금까지 쌓인 아이디어\n(아직 없음 — 오늘이 첫 시작)")
+
+    lines.append(
+        "\n---\n"
+        "[에이전트 지시] 위 오늘 논문 + 기존 아이디어를 근거로, 사용자에게 한국어로:\n"
+        "1. **빈틈 발견** — 오늘 논문 중 '이 기술은 사용자 관심 영역에 아직 적용 안 된 것 같다 = "
+        "기회/논문거리'인 것을 1-3개 짚기 (구체적으로 왜 빈틈인지)\n"
+        "2. **연결** — 오늘 논문과 '지금까지 쌓인 아이디어'가 이어지는 지점이 있으면 명시\n"
+        "3. **새 조합 제안** — 오늘 것 + 기존 것으로 만들 수 있는 새 방향 (있으면)\n"
+        "그리고 사용자가 마음에 들어하는 발견은 hotpaper_idea_log로 저장하도록 제안하세요 "
+        "(source: 논문 발견이면 'paper', 조합이면 'combined'). "
+        "논문 전문은 https://hotpaper.ai/paper/{id} 로 안내. 요약에 없는 수치는 지어내지 말 것.")
+    return "\n".join(lines)
+
+
 async def tool_popular_tags(limit: int = 30) -> str:
     """인기 dynamic tag."""
     data = await _get("/tags/popular", params={"limit": limit, "min_count": 2})
@@ -371,6 +511,37 @@ async def list_tools() -> list[Tool]:
                  "properties": {"arxiv_id": {"type": "string", "description": "예: 2607.13431"}},
                  "required": ["arxiv_id"],
              }),
+        Tool(name="hotpaper_incubate",
+             description=("아이디어 인큐베이터 (목표가 막연할 때): 오늘 논문 + 지금까지 쌓인 "
+                          "아이디어를 함께 보고 '빈틈(아직 내 분야에 안 쓰인 기술=기회) · 연결 · "
+                          "새 조합'을 찾는다. '오늘 파볼 만한 빈틈 찾아줘', '오늘 뭐 인큐베이트 "
+                          "할까?' 류에 사용. 발견은 hotpaper_idea_log로 저장 유도."),
+             inputSchema={"type": "object", "properties": {}}),
+        Tool(name="hotpaper_idea_log",
+             description=("아이디어 한 조각을 로컬 인큐베이터 노트(~/.hotpaper/ideas.jsonl)에 저장. "
+                          "논문에서 발견한 빈틈, 사용자 본인의 아이디어, 둘을 합친 새 조합 모두 저장 가능. "
+                          "'이 아이디어 저장해줘', '내 생각 적어둬' 류에 사용."),
+             inputSchema={
+                 "type": "object",
+                 "properties": {
+                     "text": {"type": "string", "description": "아이디어 내용 (한 문장~한 문단)"},
+                     "source": {"type": "string", "enum": ["paper", "mine", "combined"],
+                                "description": "paper=논문발견 / mine=내생각 / combined=조합해만든것"},
+                     "papers": {"type": "array", "items": {"type": "string"},
+                                "description": "관련 arxiv id (선택)"},
+                     "tags": {"type": "array", "items": {"type": "string"}},
+                 },
+                 "required": ["text"],
+             }),
+        Tool(name="hotpaper_idea_board",
+             description=("쌓인 아이디어 전부를 종합 — 수렴 방향(목표 후보) · 조각을 결합한 새 "
+                          "연구 방향 생성 · 다음 액션. '지금까지 아이디어 정리해줘', '이것들로 "
+                          "새로운 거 만들어봐', '내 아이디어 어디로 수렴해?' 류에 사용."),
+             inputSchema={
+                 "type": "object",
+                 "properties": {"days": {"type": "integer", "default": 0,
+                                         "description": "최근 N일만 (0=전체)"}},
+             }),
     ]
 
 
@@ -397,6 +568,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             text = await tool_today_for_me()
         elif name == "hotpaper_research_brief":
             text = await tool_research_brief(arguments["arxiv_id"])
+        elif name == "hotpaper_incubate":
+            text = await tool_incubate()
+        elif name == "hotpaper_idea_log":
+            text = tool_idea_log(
+                arguments["text"], arguments.get("source", "paper"),
+                arguments.get("papers"), arguments.get("tags"))
+        elif name == "hotpaper_idea_board":
+            text = tool_idea_board(arguments.get("days", 0))
         else:
             text = f"Unknown tool: {name}"
     except httpx.HTTPStatusError as e:

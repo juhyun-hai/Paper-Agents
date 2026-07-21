@@ -77,6 +77,29 @@ codex mcp add hotpaper -- \
 ① 내 연구와의 접점 ② 적용/확장 아이디어 2-3개 ③ 다음 읽기 경로를 안내합니다.
 (요약에 없는 수치는 지어내지 않도록 설계됨)
 
+---
+
+## 4-2. 아이디어 인큐베이터 (목표가 아직 막연할 때)
+
+"이루려는 게 아직 안 정해졌는데, 매일 논문 보며 아이디어를 쌓다 보면 방향이
+선명해졌으면" 할 때 쓰는 모드입니다. 논문에서 발견한 것 + 내 머릿속 생각이
+`~/.hotpaper/ideas.jsonl`에 함께 쌓이고, 조합해서 새 방향을 만들어냅니다.
+
+| 하고 싶은 것 | 이렇게 말하세요 |
+|---|---|
+| 오늘 파볼 빈틈 찾기 | **"오늘 논문에서 내가 파볼 만한 빈틈 찾아줘"** (오늘 논문 × 쌓인 아이디어) |
+| 아이디어 저장 | "이 아이디어 저장해줘" / "내 생각 적어둬: ..." |
+| 종합·새 방향 만들기 | **"지금까지 쌓인 아이디어 정리하고 새로운 방향 만들어봐"** |
+
+**흐름 예시:**
+- (월) "오늘 빈틈 찾아줘" → 에이전트가 오늘 논문 중 미개척 지점 짚음 → 마음에 들면 저장
+- (목) "오늘도" → 오늘 논문이 월요일 아이디어와 연결되는 지점 발견
+- (2주 뒤) "아이디어 정리해줘" → "네 관심이 이 방향으로 수렴 = 목표 후보" + 조각들을 조합한 새 연구 방향 제안
+
+내 아이디어(`source: mine`)와 논문 발견(`source: paper`)을 **교차 결합**해
+새 방향(`source: combined`)을 만드는 게 이 모드의 핵심입니다.
+매일 한 마디씩 쌓아야 효과가 납니다 — 안 쌓으면 빈 노트예요.
+
 `hotpaper_today_for_me`가 프로필 키워드로 1차 매칭을 하고,
 에이전트가 의미상 관련된 논문까지 짚어서 설명해줍니다.
 
@@ -93,10 +116,15 @@ codex mcp add hotpaper -- \
 **Q. GPU/로컬 LLM 필요한가요?**
 아니요. 지능은 여러분이 쓰는 에이전트(Claude/Codex)가 담당합니다.
 
-**Q. 제공 도구 전체 목록?**
-`hotpaper_today` · `hotpaper_today_for_me` · `hotpaper_research_brief` · `hotpaper_search` ·
-`hotpaper_paper` · `hotpaper_tag_papers` · `hotpaper_popular_tags` ·
-`hotpaper_save_profile` · `hotpaper_get_profile`
+**Q. 제공 도구 전체 목록? (12개)**
+`hotpaper_today` · `hotpaper_today_for_me` · `hotpaper_research_brief` ·
+`hotpaper_incubate` · `hotpaper_idea_log` · `hotpaper_idea_board` ·
+`hotpaper_search` · `hotpaper_paper` · `hotpaper_tag_papers` ·
+`hotpaper_popular_tags` · `hotpaper_save_profile` · `hotpaper_get_profile`
+
+**Q. 아이디어 노트는 어디 저장되나요?**
+`~/.hotpaper/ideas.jsonl` — 로컬 파일입니다. 직접 열어봐도 되고, 다른 컴퓨터로
+복사하면 그대로 이어집니다. 서버로 전송되지 않습니다.
 
 **Q. 업데이트는?**
 `uvx`는 실행 시 git에서 받아오므로, 재시작하면 최신입니다 (캐시 갱신: `uv cache clean hotpaper-companion`).
